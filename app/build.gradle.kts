@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.google.ksp)
     alias(libs.plugins.google.hilt.android)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.google.gms.google.services)
 }
 
 android {
@@ -45,8 +46,11 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.googleid)
     implementation(libs.play.services.ads)
     implementation(libs.google.hilt.android)
     implementation(libs.kotlinx.datetime)
