@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "234140004891",
+    "project_id": "bock-quest-game",
+    "storage_bucket": "bock-quest-game.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:234140004891:android:abec44325cd8c6ad3c7ebe",
+        "android_client_info": {
+          "package_name": "com.blockquest"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCI3ZPDaAYf0AVmH9IJC0X-rFikh5tuw1k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
