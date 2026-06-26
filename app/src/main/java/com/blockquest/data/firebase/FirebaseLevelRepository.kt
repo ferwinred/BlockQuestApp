@@ -49,6 +49,7 @@ class FirebaseLevelRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val database: BlockQuestDatabase,
     private val levelDao: LevelCacheDao,
+    private val generateLevel: com.blockquest.domain.usecase.GenerateLevelUseCase,
     private val io: CoroutineDispatcher = Dispatchers.IO,
 ) : LevelRepository {
 
@@ -62,21 +63,55 @@ class FirebaseLevelRepository @Inject constructor(
         val cached = levelDao.getAll().map { it.asDomain() }
             .filter { it != null }
             .map { it!! }
-        if (cached.isNotEmpty()) {
+        
+        // If empty, generate the first 2 worlds (30 levels each)
+        if (cached.isEmpty()) {
+            val generated = mutableListOf<LevelSpec>()
+            for (w in 0..1) {
+                for (l in 1..30) {
+                    generated.add(generateLevel(w, l))
+                }
+            }
+            emit(generated)
+            // Optionally persist them
+            database.withTransaction {
+                generated.forEach { levelDao.upsert(it.asEntity()) }
+            }
+        } else {
             emit(cached)
         }
-        // Phase 2: refresh from Firestore.
-        refreshFromFirestore()
-        val refreshed = levelDao.getAll().map { it.asDomain() }
-            .filter { it != null }
-            .map { it!! }
-        emit(refreshed)
+
+        // Phase 2: refresh from Firestore (optional background sync)
+        try {
+            refreshFromFirestore()
+            val refreshed = levelDao.getAll().map { it.asDomain() }
+                .filter { it != null }
+                .map { it!! }
+            emit(refreshed)
+        } catch (e: Exception) {
+            // Log error but keep showing cached/generated levels
+        }
     }.flowOn(io)
 
     override suspend fun getLevel(levelId: String): LevelSpec? {
         // Fast path: local cache.
         levelDao.getById(levelId)?.asDomain()?.let { return it }
-        // Slow path: Firestore. Update the cache for next time.
+        
+        // If it looks like a generated ID, generate it on the fly
+        if (levelId.startsWith("world_")) {
+            val parts = levelId.split("_")
+            if (parts.size == 4) {
+                val world = parts[1].toIntOrNull()
+                val num = parts[3].toIntOrNull()
+                if (world != null && num != null) {
+                    val gen = generateLevel(world, num)
+                    database.withTransaction {
+                        levelDao.upsert(gen.asEntity())
+                    }
+                    return gen
+                }
+            }
+        }
         val snapshot = firestore.collection("levels")
             .document(levelId)
             .get(Source.SERVER)

@@ -8,6 +8,7 @@ package com.blockquest.presentation.ui.screen.gameplay
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -59,14 +60,18 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.blockquest.domain.board.BoardValidator
 import com.blockquest.domain.model.Cell
 import com.blockquest.domain.model.CellState
 import com.blockquest.domain.model.PieceShape
@@ -92,15 +97,9 @@ import kotlin.time.Duration.Companion.milliseconds
 fun GameplayScreen(
     levelId: String,
     onExit: () -> Unit,
-    viewModel: GameplayViewModel = hiltViewModel(
-        checkNotNull<ViewModelStoreOwner>(
-            LocalViewModelStoreOwner.current
-        ) {
-                "No ViewModelStoreOwner was provided via LocalViewModelStoreOwner"
-            }, null
-    ),
+    viewModel: GameplayViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.engine.state.collectAsStateWithLifecycle()
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val lastStats by viewModel.lastStats.collectAsStateWithLifecycle()
     val dragController = remember { DragController() }
@@ -122,10 +121,10 @@ fun GameplayScreen(
     // Each set is reset to empty one frame after being set so the
     // LaunchedEffect inside CellView triggers exactly once per event.
     LaunchedEffect(Unit) {
-        viewModel.engine.events.collect { event ->
+        viewModel.events.collect { event ->
             when (event) {
                 is GameEvent.LinesCleared -> {
-                    val board = viewModel.engine.state.value.board
+                    val board = viewModel.state.value.board
                     val cells = buildSet {
                         event.rows.forEach    { r -> for (x in 0 until board.width)  add(x to r) }
                         event.columns.forEach { c -> for (y in 0 until board.height) add(c to y) }
@@ -159,23 +158,6 @@ fun GameplayScreen(
                     }
                 }
                 else -> Unit
-            }
-        }
-    }
-
-    // Tick the engine every animation frame when the level
-    // has a time limit.
-    var lastFrameNanos by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(level?.timeLimitSeconds) {
-        if ((level?.timeLimitSeconds ?: 0f) > 0f) {
-            while (true) {
-                withFrameNanos { now ->
-                    if (lastFrameNanos != 0L) {
-                        val deltaMs = (now - lastFrameNanos) / 1_000_000L
-                        viewModel.tick(deltaMs)
-                    }
-                    lastFrameNanos = now
-                }
             }
         }
     }
@@ -234,6 +216,7 @@ fun GameplayScreen(
                             onDrop = { trayIndex, col, row ->
                                 viewModel.place(trayIndex, col, row)
                             },
+                            engineState = state,
                         )
                         // Particle burst — shown on combos.
                         ComboParticleOverlay(
@@ -256,6 +239,7 @@ fun GameplayScreen(
                     onDrop = { trayIndex, col, row ->
                         viewModel.place(trayIndex, col, row)
                     },
+                    engineState = state,
                 )
                 lastStats?.let { stats ->
                     StatsBanner(
@@ -331,6 +315,7 @@ private fun BoardWithDragDrop(
     heatUnlockCells: Set<Pair<Int,Int>> = emptySet(),
     onCellTap: (Int, Int) -> Unit,
     onDrop: (Int, Int, Int) -> Unit,
+    engineState: GameState,
 ) {
     val level = state.level ?: return
     val (w, h) = level.boardSize
@@ -481,34 +466,31 @@ private fun DragGhost(
     val width = cellSizeDp * pw
     val height = cellSizeDp * ph
     val color = if (isValid) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
     } else {
-        MaterialTheme.colorScheme.error.copy(alpha = 0.55f)
+        MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
     }
-    Column(
+    
+    // Usamos graphicsLayer para optimizar el movimiento sin recomponer todo
+    Box(
         modifier = Modifier
-            .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
             .size(width, height)
+            .graphicsLayer {
+                translationX = offsetX
+                translationY = offsetY - 300f // Lift compensation
+            }
             .background(color, RoundedCornerShape(4.dp))
-            .border(2.dp, Color.White, RoundedCornerShape(4.dp))
-            .alpha(0.85f)
+            .alpha(0.9f)
     ) {
-        for (r in 0 until ph) {
-            Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                for (c in 0 until pw) {
-                    val filled = piece.cells.any { it.col == c && it.row == r }
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxSize()
-                            .padding(1.dp)
-                            .background(
-                                if (filled) Color.White.copy(alpha = 0.35f)
-                                else Color.Transparent,
-                                RoundedCornerShape(2.dp)
-                            )
-                    )
-                }
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val cW = size.width / pw
+            val cH = size.height / ph
+            piece.cells.forEach { cell ->
+                drawRect(
+                    color = Color.White.copy(alpha = 0.4f),
+                    topLeft = Offset(cell.col * cW + 1f, cell.row * cH + 1f),
+                    size = androidx.compose.ui.geometry.Size(cW - 2f, cH - 2f)
+                )
             }
         }
     }
@@ -600,6 +582,7 @@ private fun TrayRow(
     onPieceTap: (Int) -> Unit,
     dragController: DragController,
     onDrop: (trayIndex: Int, col: Int, row: Int) -> Unit,
+    engineState: GameState,
 ) {
     val dragByController by dragController.state.collectAsStateWithLifecycle()
     Row(
@@ -620,9 +603,8 @@ private fun TrayRow(
                 BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
             } else null
 
-            // Capture the absolute position of this piece slot so that
-            // startDrag receives the correct touch anchor in screen space.
-            var slotOriginInRoot = remember { Offset.Zero }
+            // Use onGloballyPositioned to get the absolute screen position of the slot
+            var slotPosition by remember { mutableStateOf(Offset.Zero) }
 
             Box(
                 modifier = Modifier
@@ -636,21 +618,19 @@ private fun TrayRow(
                         )
                     )
                     .let { if (border != null) it.border(border, RoundedCornerShape(6.dp)) else it }
-                    .onSizeChanged { /* size tracked via BoxWithConstraints below */ }
+                    .onGloballyPositioned { coordinates ->
+                        slotPosition = coordinates.positionInRoot()
+                    }
                     .pointerInput(index, shape) {
                         detectDragGesturesAfterLongPress(
                             onDragStart = { localOffset ->
-                                // localOffset is relative to this Box.
-                                // DragController works in board-relative
-                                // coordinates — pass 0,0 as the screen
-                                // touch so the offset calculation starts
-                                // fresh from the first updateDrag call.
+                                // Calculamos la posición inicial relativa al contenedor raíz del juego
                                 val ds = dragController.state.value
                                 dragController.startDrag(
                                     trayIndex    = index,
                                     piece        = shape,
-                                    touchX       = 0f,
-                                    touchY       = 0f,
+                                    touchX       = slotPosition.x + localOffset.x,
+                                    touchY       = slotPosition.y + localOffset.y,
                                     cellSize     = ds.cellSize,
                                     boardOriginX = ds.boardOriginX,
                                     boardOriginY = ds.boardOriginY,
@@ -658,20 +638,21 @@ private fun TrayRow(
                             },
                             onDrag = { change, dragAmount ->
                                 change.consume()
+                                // Usamos coordenadas absolutas para el movimiento
+                                val currentX = dragByController.offsetX + dragAmount.x
+                                val currentY = dragByController.offsetY + dragAmount.y
+                                
                                 dragController.updateDrag(
-                                    touchX   = dragController.state.value.offsetX + dragAmount.x,
-                                    touchY   = dragController.state.value.offsetY + dragAmount.y,
-                                    canPlace = { piece, cell ->
-                                        // Lightweight placement check: the board
-                                        // bounds check and occupancy are validated
-                                        // inside GameplayEngine.place(); here we
-                                        // only need the on-screen validity flag.
-                                        val ds = dragController.state.value
-                                        val boardW = if (ds.cellSize > 0f)
-                                            (ds.boardOriginX + 1000f).toInt() else 8
-                                        cell.col >= 0 && cell.row >= 0
-                                    },
+                                    touchX   = currentX,
+                                    touchY   = currentY,
                                 )
+                                
+                                // Actualizamos la validez por separado para evitar lambdas pesadas en el controller
+                                val ds = dragController.state.value
+                                val isValid = if (ds.ghostCol >= 0 && ds.ghostRow >= 0) {
+                                    BoardValidator.canPlace(engineState.board, shape, Cell(ds.ghostCol, ds.ghostRow))
+                                } else false
+                                dragController.setValid(isValid)
                             },
                             onDragEnd = {
                                 val drop = dragController.endDrag()
@@ -692,7 +673,7 @@ private fun TrayRow(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(2.dp)
-                        .alpha(if (isSelected && dragByController.isDragging) 0.4f else 1f),
+                        .alpha(if (isSelected && dragByController.isDragging) 0f else 1f), // Hide original when dragging
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }

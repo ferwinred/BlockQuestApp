@@ -65,10 +65,24 @@ class SoundManager @Inject constructor(
 
     // sound-id map populated after load completes.
     private val ids = mutableMapOf<Sfx, Int>()
+    private val loadedIds = mutableSetOf<Int>()
 
     init {
+        pool.setOnLoadCompleteListener { _, sampleId, status ->
+            if (status == 0) {
+                loadedIds.add(sampleId)
+            }
+        }
+        
         Sfx.entries.forEach { sfx ->
-            ids[sfx] = pool.load(context, sfx.resId, sfx.priority)
+            try {
+                val id = pool.load(context, sfx.resId, sfx.priority)
+                if (id != 0) {
+                    ids[sfx] = id
+                }
+            } catch (e: Exception) {
+                // Ignore load errors for now, play() handles missing ids
+            }
         }
     }
 
@@ -76,7 +90,9 @@ class SoundManager @Inject constructor(
     fun play(sfx: Sfx) {
         if (!_soundEnabled.value) return
         val id = ids[sfx] ?: return
-        pool.play(id, sfx.leftVol, sfx.rightVol, sfx.priority, sfx.loop, sfx.rate)
+        if (loadedIds.contains(id)) {
+            pool.play(id, sfx.leftVol, sfx.rightVol, sfx.priority, sfx.loop, sfx.rate)
+        }
     }
 
     fun setEnabled(enabled: Boolean) {

@@ -6,6 +6,7 @@
 package com.blockquest
 
 import android.os.Bundle
+import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -25,14 +26,37 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.blockquest.presentation.designsystem.Palettes
+import com.google.android.gms.ads.MobileAds
+import com.blockquest.data.ads.AdConsentManager
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var consentManager: AdConsentManager
+
+    override fun getSystemService(name: String): Any? {
+        if (name == Context.PERSISTENT_DATA_BLOCK_SERVICE) {
+            return null
+        }
+        return super.getSystemService(name)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { BlockQuestGame() }
+        setContent {
+            LaunchedEffect(Unit) {
+                consentManager.requestConsentIfNeeded(this@MainActivity)
+                MobileAds.initialize(this@MainActivity) {}
+            }
+            BlockQuestGame()
+        }
     }
 
     override fun onResume() {

@@ -9,14 +9,11 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.blockquest.domain.model.Cell
-import com.blockquest.domain.model.CosmeticInventory
 import com.blockquest.domain.model.MissionEvent
 import com.blockquest.domain.model.MissionProgress
-import com.blockquest.domain.model.PieceShape
 import com.blockquest.domain.repository.AdPlacement
 import com.blockquest.domain.repository.AdResult
 import com.blockquest.domain.repository.AnalyticsRepository
-import com.blockquest.domain.repository.CosmeticRepository
 import com.blockquest.domain.repository.PlayerRepository
 import com.blockquest.domain.usecase.CompleteLevelUseCase
 import com.blockquest.domain.usecase.GetLevelUseCase
@@ -37,7 +34,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -94,19 +90,10 @@ class GameplayViewModel @Inject constructor(
     private val _ui = MutableStateFlow(GameplayUiState())
     val ui: StateFlow<GameplayUiState> = _ui
 
-    val state: StateFlow<GameState> = engine.state.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.Eagerly,
-        initialValue = GameState(),
-    )
+    val state: StateFlow<GameState> = engine.state
 
     val events: SharedFlow<GameEvent> = engine.events
 
-    /**
-     * The active palette. Bound to the player's equipped
-     * skin. The GameplayScreen wraps the content in
-     * `BlockQuestTheme(palette = ...)`.
-     */
     val palette: StateFlow<SemanticColors> = observeCosmetics().map { state ->
         Palettes.forTheme(state.inventory.activeSkinId)
     }.stateIn(
@@ -115,10 +102,6 @@ class GameplayViewModel @Inject constructor(
         initialValue = Palettes.GrassLand,
     )
 
-    /**
-     * The active title id. The presentation layer can
-     * render this next to the player's name.
-     */
     val activeTitleId: StateFlow<String?> = observeCosmetics().map {
         it.inventory.activeTitleId
     }.stateIn(
@@ -127,31 +110,34 @@ class GameplayViewModel @Inject constructor(
         initialValue = null,
     )
 
-    /**
-     * One-shot event for "I'm currently showing a rewarded
-     * ad" so the UI can show a loading spinner / dim the
-     * board.
-     */
     private val _isAdInProgress = MutableStateFlow(false)
     val isAdInProgress: StateFlow<Boolean> = _isAdInProgress
 
+    // Tick the engine using a standard coroutine delay for timing.
+    // withFrameNanos is only for UI-bound animations.
     init {
-        // Preload the first rewarded ad so the player can
-        // continue after game-over with zero latency.
         viewModelScope.launch {
-            preloadRewardedAd(AdPlacement.ContinueAfterGameOver)
+            var lastMs = System.currentTimeMillis()
+            while (true) {
+                val now = System.currentTimeMillis()
+                val delta = now - lastMs
+                if (delta > 0) {
+                    tick(delta)
+                }
+                lastMs = now
+                kotlinx.coroutines.delay(16) // ~60 FPS
+            }
         }
     }
 
-    /**
-     * Memos: the engine's "last frame" stats. We snapshot
-     * them at every accepted placement so the UI can show
-     * "you cleared 2 lines" feedback.
-     */
     private val _lastStats = MutableStateFlow<PlacementResult.Accepted?>(null)
     val lastStats: StateFlow<PlacementResult.Accepted?> = _lastStats
 
     init {
+        viewModelScope.launch {
+            preloadRewardedAd(AdPlacement.ContinueAfterGameOver)
+        }
+        
         viewModelScope.launch {
             runCatching {
                 val level = getLevel(levelId) ?: error("Level $levelId not found")
@@ -166,14 +152,7 @@ class GameplayViewModel @Inject constructor(
                 _ui.value = _ui.value.copy(isLoading = false)
             }
         }
-    }
 
-    // ── Audio / haptic event collector ───────────────────────────────
-    // Runs for the lifetime of the ViewModel. Each engine event is
-    // mapped to a sound effect and/or a haptic pattern. The collector
-    // never blocks: SoundManager.play() and HapticManager.vibrate()
-    // are both synchronous and lightweight.
-    init {
         viewModelScope.launch {
             engine.events.collect { event ->
                 when (event) {
@@ -193,7 +172,6 @@ class GameplayViewModel @Inject constructor(
                         haptic.vibrate(com.blockquest.audio.HapticPattern.COMBO)
                     }
                     is GameEvent.StreakUpdated -> {
-                        // Only play at "high" streak levels (≥ 3) to avoid audio spam.
                         if (event.level >= 3) {
                             sound.play(com.blockquest.audio.Sfx.STREAK_HIGH)
                         }
@@ -216,10 +194,6 @@ class GameplayViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Place a piece from the tray at (col, row). Used by
-     * both the tap-tap UI and the drag-and-drop UI.
-     */
     fun place(trayIndex: Int, col: Int, row: Int) {
         val origin = Cell(col, row)
         val result = engine.place(trayIndex, origin)
@@ -244,15 +218,6 @@ class GameplayViewModel @Inject constructor(
     fun resume() = engine.resume()
     fun tick(deltaMs: Long) = engine.tick(deltaMs)
 
-    /**
-     * Continue after game-over by watching a rewarded ad.
-     * The ad call is async; while the ad is on screen we
-     * flip `isAdInProgress = true` so the UI can disable
-     * the buttons. When the ad completes, the engine
-     * gets 3 extra pieces + a shield; if the user
-     * dismissed the ad, we just leave the game-over
-     * overlay up.
-     */
     fun continueWithAd() {
         viewModelScope.launch {
             _isAdInProgress.value = true
@@ -262,10 +227,6 @@ class GameplayViewModel @Inject constructor(
             }
             _isAdInProgress.value = false
             if (result is AdResult.Failed) {
-                // Surface a soft error in the UI. The
-                // presentation layer can show a snackbar
-                // or fall back to the "spend 50 gems"
-                // path.
                 analytics.logEvent(
                     "ad_continue_failed",
                     mapOf("reason" to result.reason),
@@ -274,9 +235,6 @@ class GameplayViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Continue by spending 50 gems (the "no-ad" path).
-     */
     fun continueWithGems(costGems: Int = 50) {
         viewModelScope.launch {
             val ok = players.trySpendGems(costGems, "revive")
@@ -288,40 +246,16 @@ class GameplayViewModel @Inject constructor(
         }
     }
 
-    fun continueWithExtraPieces(count: Int = 3) = engine.continueWithExtraPieces(count)
-    fun usePowerUp(powerUpId: String, col: Int, row: Int) =
-        engine.usePowerUp(powerUpId, Cell(col, row))
     fun restartLevel() = engine.restartLevel()
     fun dismissOverlay() {
         _ui.value = _ui.value.copy(pendingOverlay = GameplayOverlay.None)
     }
 
-    fun claimDailyReward() = viewModelScope.launch {
-        // Delegated to the player repo via the daily reward modal.
-        players.claimDailyReward()
-    }
-
-    // -----------------------------------------------------------------
-    // Internals
-    // -----------------------------------------------------------------
-
     private fun onAccepted(result: PlacementResult.Accepted) {
-        // Build the mission event(s) and forward.
         val s = engine.state.value
         val pieceCellCount = result.filledCells.size
-        val piece = s.tray.firstOrNull()?.let { _ ->
-            // We don't have direct access to the piece that
-            // was placed; the engine already mutated the
-            // state, so we use the placed cell count and
-            // infer the events from the result.
-            pieceCellCount
-        } ?: 0
         viewModelScope.launch {
-            // 1. Piece placed.
-            processMissionEvent(
-                MissionEvent.PiecePlaced(cellCount = pieceCellCount)
-            )
-            // 2. Lines / squares cleared.
+            processMissionEvent(MissionEvent.PiecePlaced(cellCount = pieceCellCount))
             if (result.clearedRows.isNotEmpty() || result.clearedColumns.isNotEmpty()) {
                 processMissionEvent(
                     MissionEvent.LinesCleared(
@@ -331,17 +265,13 @@ class GameplayViewModel @Inject constructor(
                 )
             }
             if (result.clearedSquares3x3.isNotEmpty()) {
-                processMissionEvent(
-                    MissionEvent.SquaresCleared(count = result.clearedSquares3x3.size)
-                )
+                processMissionEvent(MissionEvent.SquaresCleared(count = result.clearedSquares3x3.size))
             }
-            // 3. Combo / streak.
             if (result.combo.ordinal > 0) {
                 processMissionEvent(MissionEvent.ComboAchieved(result.combo))
             }
             processMissionEvent(MissionEvent.StreakAchieved(s.streak))
             processMissionEvent(MissionEvent.ScoreReached(s.score))
-            // 4. Big clear / perfect clear.
             if (result.totalCleared >= 5) {
                 processMissionEvent(MissionEvent.BigClear(result.totalCleared))
             }
@@ -356,11 +286,8 @@ class GameplayViewModel @Inject constructor(
                     )
                 )
             }
-            // 5. Special cells cleared.
             if (result.additionalCleared.isNotEmpty()) {
-                processMissionEvent(
-                    MissionEvent.SpecialCellsCleared(count = result.additionalCleared.size)
-                )
+                processMissionEvent(MissionEvent.SpecialCellsCleared(count = result.additionalCleared.size))
             }
         }
     }
@@ -368,10 +295,6 @@ class GameplayViewModel @Inject constructor(
     private fun onCompleted(result: PlacementResult.Completed) {
         val level = engine.state.value.level ?: return
         viewModelScope.launch {
-            // Compute the reward.
-            // Determine whether this is the player's first successful clear of this level.
-            // We query the progression snapshot BEFORE recording the result so that a
-            // stars == 0 entry (or a missing entry) reliably means "never completed before".
             val existingResult = withTimeoutOrNull(3_000L) {
                 progression.observeProgression().firstOrNull()
             }
@@ -382,7 +305,6 @@ class GameplayViewModel @Inject constructor(
                 stars = result.stars,
                 isFirstClear = isFirstClear,
             )
-            // Persist.
             completeLevel(
                 levelId = level.levelId,
                 finalScore = result.finalScore,
@@ -390,7 +312,6 @@ class GameplayViewModel @Inject constructor(
                 rewardCoins = reward.coins,
                 rewardGems = reward.gems,
             )
-            // Mission event.
             val newMissions = processMissionEvent(
                 MissionEvent.LevelCompleted(
                     worldIndex = level.worldIndex,
