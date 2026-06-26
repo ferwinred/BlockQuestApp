@@ -23,7 +23,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -36,6 +38,7 @@ data class WorldMapUiState(
     val unlockState: UnlockState? = null,
     val pendingWorldUnlock: WorldDefinition? = null,
     val isLoading: Boolean = true,
+    val errorMessage: String? = null,
 )
 
 @HiltViewModel
@@ -49,47 +52,57 @@ class WorldMapViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _pendingWorld = MutableStateFlow<WorldDefinition?>(null)
+    private val retryTrigger = MutableStateFlow(0)
 
-    val ui: StateFlow<WorldMapUiState> = combine(
-        observeLevels(),
-        observeWorlds(),
-        progressionRepo.observeProgression(),
-        _pendingWorld,
-    ) { levels, worlds, prog, pendingWorld ->
-        val unlocks = unlockService.evaluate(worlds, levels, prog)
-        val worldStates = worlds.map { w ->
-            val levelsInWorld = levels.filter { it.worldIndex == w.worldIndex }
-            val totalLevels = levelsInWorld.size
-            val completedLevels = levelsInWorld.count {
-                prog.results[it.levelId]?.completed == true
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val ui: StateFlow<WorldMapUiState> = retryTrigger.flatMapLatest {
+        combine(
+            observeLevels(),
+            observeWorlds(),
+            progressionRepo.observeProgression(),
+            _pendingWorld,
+        ) { levels, worlds, prog, pendingWorld ->
+            val unlocks = unlockService.evaluate(worlds, levels, prog)
+            val worldStates = worlds.map { w ->
+                val levelsInWorld = levels.filter { it.worldIndex == w.worldIndex }
+                val totalLevels = levelsInWorld.size
+                val completedLevels = levelsInWorld.count {
+                    prog.results[it.levelId]?.completed == true
+                }
+                val totalStars = levelsInWorld.sumOf {
+                    prog.results[it.levelId]?.stars ?: 0
+                }
+                val maxStars = totalLevels * 3
+                WorldState(
+                    definition = w,
+                    isUnlocked = w.worldIndex in unlocks.unlockedWorlds,
+                    completedLevels = completedLevels,
+                    totalLevels = totalLevels,
+                    totalStars = totalStars,
+                    maxStars = maxStars,
+                )
             }
-            val totalStars = levelsInWorld.sumOf {
-                prog.results[it.levelId]?.stars ?: 0
-            }
-            val maxStars = totalLevels * 3
-            WorldState(
-                definition = w,
-                isUnlocked = w.worldIndex in unlocks.unlockedWorlds,
-                completedLevels = completedLevels,
-                totalLevels = totalLevels,
-                totalStars = totalStars,
-                maxStars = maxStars,
+            WorldMapUiState(
+                levels = levels,
+                worlds = worlds,
+                worldStates = worldStates,
+                progression = prog,
+                unlockState = unlocks,
+                pendingWorldUnlock = pendingWorld,
+                isLoading = false,
             )
+        }.catch { e ->
+            emit(WorldMapUiState(isLoading = false, errorMessage = e.message ?: "Error de red"))
         }
-        WorldMapUiState(
-            levels = levels,
-            worlds = worlds,
-            worldStates = worldStates,
-            progression = prog,
-            unlockState = unlocks,
-            pendingWorldUnlock = pendingWorld,
-            isLoading = false,
-        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000L),
         initialValue = WorldMapUiState(),
     )
+
+    fun retry() {
+        retryTrigger.value += 1
+    }
 
     /**
      * Mark the world as known-unlocked. Called from the

@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Lock
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -76,7 +78,7 @@ import kotlin.math.sin
 @Composable
 fun LevelSelectScreen(
     worldIndex: Int,
-    onLevelSelected: (String) -> Unit,
+    onLevelSelected: (String, List<String>) -> Unit,
     onBack: () -> Unit,
     onMissionsClick: () -> Unit = {},
     viewModel: LevelSelectViewModel = hiltViewModel(),
@@ -104,10 +106,23 @@ fun LevelSelectScreen(
                 .padding(padding),
         ) {
             if (state.isLoading) {
-                Text(
-                    text = "Cargando niveles…",
-                    modifier = Modifier.align(Alignment.Center),
-                )
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (state.errorMessage != null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = state.errorMessage!!,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Spacer(modifier = Modifier.padding(8.dp))
+                        Button(onClick = { viewModel.retry() }) {
+                            Text("Reintentar")
+                        }
+                    }
+                }
             } else {
                 Column(modifier = Modifier.fillMaxSize()) {
                     // Header
@@ -134,7 +149,8 @@ fun LevelSelectScreen(
                     }
 
                     // Map Path
-                    WorldMapPath(
+                    InteractiveWorldMap(
+                        worldIndex = state.worldIndex,
                         levels = state.levels,
                         onLevelClick = { item ->
                             if (!item.isUnlocked) {
@@ -154,60 +170,14 @@ fun LevelSelectScreen(
                 result    = previewLevel?.let { l ->
                     state.levels.find { it.spec.levelId == l.levelId }?.result
                 },
+                viewModel = viewModel,
+                inventory = state.inventory,
                 onDismiss = { previewLevel = null },
-                onPlay    = { levelId ->
+                onPlay    = { levelId, boosters ->
                     previewLevel = null
-                    onLevelSelected(levelId)
+                    onLevelSelected(levelId, boosters)
                 },
             )
-        }
-    }
-}
-
-@Composable
-private fun WorldMapPath(
-    levels: List<LevelSelectItem>,
-    onLevelClick: (LevelSelectItem) -> Unit
-) {
-    val scrollState = rememberScrollState()
-    
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(vertical = 40.dp)
-    ) {
-        // Decorative River
-        Canvas(modifier = Modifier.fillMaxWidth().height(1500.dp)) {
-            val riverPath = Path().apply {
-                moveTo(size.width * 0.8f, 0f)
-                var currentY = 0f
-                while (currentY < size.height) {
-                    currentY += 50f
-                    val x = size.width * 0.8f + sin(currentY / 150f) * 60f
-                    lineTo(x, currentY)
-                }
-                lineTo(size.width, size.height)
-                lineTo(size.width, 0f)
-                close()
-            }
-            drawPath(riverPath, Color(0xFFB3E5FC))
-        }
-
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(60.dp)
-        ) {
-            levels.forEachIndexed { index, item ->
-                val xOffset = sin(index.toFloat() * 1.2f) * 80f
-                
-                LevelNode(
-                    item = item,
-                    onClick = { onLevelClick(item) },
-                    modifier = Modifier.offset(x = xOffset.dp)
-                )
-            }
         }
     }
 }
@@ -324,8 +294,10 @@ private fun CurrencyBox(icon: String, value: String) {
 private fun LevelPreviewSheet(
     level: LevelSpec?,
     result: LevelResult?,
+    viewModel: LevelSelectViewModel,
+    inventory: Map<String, Int>,
     onDismiss: () -> Unit,
-    onPlay: (String) -> Unit,
+    onPlay: (String, List<String>) -> Unit,
 ) {
     AnimatedVisibility(
         visible = level != null,
@@ -346,8 +318,14 @@ private fun LevelPreviewSheet(
         exit = slideOutVertically(targetOffsetY = { it }),
         modifier = Modifier.fillMaxSize()
     ) {
+        var selectedBoosters by remember { mutableStateOf(emptyList<String>()) }
+        var boosterSelectionManual by remember { mutableStateOf(false) }
+        
         Box(contentAlignment = Alignment.BottomCenter) {
             level?.let { lvl ->
+                val topScores by viewModel.observeTopScores(lvl.levelId)
+                    .collectAsStateWithLifecycle(initialValue = emptyList())
+
                 Surface(
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                     color = Color.White,
@@ -375,8 +353,80 @@ private fun LevelPreviewSheet(
                             }
                         }
 
+                        // Leaderboard Section
+                        if (topScores.isNotEmpty()) {
+                            Text("Mejores Puntuaciones", style = MaterialTheme.typography.titleSmall)
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp))
+                                    .padding(8.dp)
+                            ) {
+                                topScores.forEachIndexed { index, entry ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("${index + 1}. ${entry.displayName}", style = MaterialTheme.typography.bodyMedium)
+                                        Text("${entry.score}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+
+
+                        // Booster Selection
+                        Text("Equipar Boosters (Máx 3)", style = MaterialTheme.typography.titleSmall)
+                        val availableBoosters = inventory.filterValues { it > 0 }
+                        if (availableBoosters.isEmpty()) {
+                            Text("No tienes boosters", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                availableBoosters.forEach { (boosterId, count) ->
+                                    val isSelected = selectedBoosters.contains(boosterId)
+                                    val name = when(boosterId) {
+                                        "booster_bomb" -> "Bomba"
+                                        "booster_reroll" -> "Mano"
+                                        "booster_smart_move" -> "Auto"
+                                        "booster_double_score" -> "Puntosx2"
+                                        "booster_time_freeze" -> "Reloj"
+                                        else -> boosterId
+                                    }
+                                    Surface(
+                                        color = if (isSelected) Color(0xFF4CAF50) else Color.LightGray,
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.clickable {
+                                            boosterSelectionManual = true
+                                            if (isSelected) {
+                                                selectedBoosters = selectedBoosters - boosterId
+                                            } else if (selectedBoosters.size < 3) {
+                                                selectedBoosters = selectedBoosters + boosterId
+                                            }
+                                        }
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text(name, color = if(isSelected) Color.White else Color.Black, fontSize = 12.sp)
+                                            Text("x$count", color = if(isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         Button(
-                            onClick = { onPlay(lvl.levelId) },
+                            onClick = {
+                                val finalBoosters = if (boosterSelectionManual) {
+                                    selectedBoosters
+                                } else {
+                                    inventory.filterValues { it > 0 }.keys.shuffled().take(3)
+                                }
+                                onPlay(lvl.levelId, finalBoosters)
+                            },
                             modifier = Modifier.fillMaxWidth().height(56.dp),
                             shape = RoundedCornerShape(28.dp)
                         ) {

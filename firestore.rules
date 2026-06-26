@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Players can only read and write their own data
+    match /players/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow access to subcollections under the player's document
+      match /{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // 2. Leaderboard (for week 5)
+    match /leaderboard/{levelId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null; // To be restricted via Cloud Function later
+    }
+
+    // 3. Read-only content collections 
+    // Allow read to authenticated users. Write is false.
+    match /worlds/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /levels/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /missions/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /cosmetics/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /config/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}

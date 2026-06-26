@@ -96,7 +96,7 @@ object DailyRewardService {
         cycle = listOf(
             DailyRewardDay(1, coins = 50),
             DailyRewardDay(2, coins = 75),
-            DailyRewardDay(3, coins = 100),
+            DailyRewardDay(3, coins = 100, gems = 5),
             DailyRewardDay(4, coins = 25, gems = 5),
             DailyRewardDay(5, coins = 150),
             DailyRewardDay(6, coins = 200),

@@ -88,6 +88,7 @@ data class PlayerDto(
 data class CurrencyDto(
     val coins: Long = 0,
     val gems: Long = 0,
+    val boosters: Map<String, Int> = emptyMap(),
 )
 
 @Serializable
@@ -144,7 +145,11 @@ data class LevelDto(
 data class BoardSizeDto(val width: Int = 8, val height: Int = 8)
 
 @Serializable
-data class CellDto(val col: Int = 0, val row: Int = 0)
+data class CellDto(
+    val col: Int = 0,
+    val row: Int = 0,
+    val type: String = "Occupied"
+)
 
 @Serializable
 data class BossConfigDto(

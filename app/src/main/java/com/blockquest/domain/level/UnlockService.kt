@@ -121,18 +121,18 @@ class UnlockService @Inject constructor() {
      * Default unlock-star requirements per world. 0 for
      * world 0, then ramps up:
      *
-     *   0 → n/a (always unlocked)
-     *   1 → 3 stars  (1 star in 3 levels of world 0)
-     *   2 → 9 stars  (3 stars in 3 levels of world 1)
-     *   3 → 18 stars
-     *   4 → 27 stars
+     *   0 -> n/a (always unlocked)
+     *   1 -> 15 stars (max stars in world 0 is likely 30, so half of it)
+     *   2 -> 30 stars
+     *   3 -> 45 stars
+     *   4 -> 60 stars
      */
     fun defaultUnlockStars(worldIndex: Int): Int = when (worldIndex) {
         0 -> 0
-        1 -> 3
-        2 -> 9
-        3 -> 18
-        4 -> 27
+        1 -> 15
+        2 -> 30
+        3 -> 45
+        4 -> 60
         else -> 0
     }
 }

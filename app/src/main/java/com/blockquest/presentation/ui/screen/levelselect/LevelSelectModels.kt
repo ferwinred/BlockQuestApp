@@ -18,10 +18,14 @@ data class LevelSelectItem(
 /** Full UI state for [LevelSelectScreen]. */
 data class LevelSelectUiState(
     val worldName: String = "",
+    val worldIndex: Int = 0,
+
     val levels: List<LevelSelectItem> = emptyList(),
     val completedCount: Int = 0,
     val totalCount: Int = 0,
     val totalStars: Int = 0,
+    val inventory: Map<String, Int> = emptyMap(),
     val maxStars: Int = 0,
     val isLoading: Boolean = true,
+    val errorMessage: String? = null,
 )

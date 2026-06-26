@@ -47,8 +47,8 @@ sealed class CellState {
  * Position on the board. We use a value class so the JVM emits a
  * primitive `int` for each axis — same perf as the C# Vector2Int.
  */
-data class Cell(val col: Int, val row: Int) {
-    operator fun plus(other: Cell) = Cell(col + other.col, row + other.row)
+data class Cell(val col: Int, val row: Int, val type: String = "Occupied") {
+    operator fun plus(other: Cell) = Cell(col + other.col, row + other.row, type)
 
     companion object {
         val Zero = Cell(0, 0)
@@ -120,6 +120,7 @@ data class BossConfig(
 data class CurrencyState(
     val coins: Int = 0,
     val gems: Int = 0,
+    val boosters: Map<String, Int> = emptyMap(),
 )
 
 /**

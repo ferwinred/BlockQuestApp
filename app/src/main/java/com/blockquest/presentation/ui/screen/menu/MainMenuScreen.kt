@@ -49,6 +49,8 @@ fun MainMenuScreen(
     onPlayClicked: () -> Unit,
     onMissionsClicked: () -> Unit,
     onCosmeticsClicked: () -> Unit,
+    onStoreClicked: () -> Unit,
+    onSettingsClicked: () -> Unit,
     viewModel: MainMenuViewModel = hiltViewModel(),
 ) {
     val state by viewModel.ui.collectAsStateWithLifecycle()
@@ -120,9 +122,10 @@ fun MainMenuScreen(
             )
         }
 
-        MenuButton(icon = Icons.Default.EmojiEvents, text = "Misiones", onClick = onMissionsClicked)
-        MenuButton(icon = Icons.Default.ShoppingCart, text = "Tienda", onClick = onCosmeticsClicked)
-        MenuButton(icon = Icons.Default.Settings, text = "Ajustes", onClick = {})
+        MenuButton(icon = Icons.Default.EmojiEvents, text = "Misiones", onClick = onMissionsClicked, showBadge = state.hasUnclaimedMissions)
+        MenuButton(icon = Icons.Default.ShoppingCart, text = "Tienda", onClick = onStoreClicked)
+        MenuButton(icon = Icons.Default.Settings, text = "Cosméticos", onClick = onCosmeticsClicked)
+        MenuButton(icon = Icons.Default.Settings, text = "Ajustes", onClick = onSettingsClicked)
 
         Spacer(Modifier.weight(1f))
     }
@@ -147,7 +150,7 @@ private fun CurrencyBox(icon: String, value: String) {
 }
 
 @Composable
-private fun MenuButton(icon: ImageVector, text: String, onClick: () -> Unit) {
+private fun MenuButton(icon: ImageVector, text: String, showBadge: Boolean = false, onClick: () -> Unit) {
     Button(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -162,7 +165,17 @@ private fun MenuButton(icon: ImageVector, text: String, onClick: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+            Box {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+                if (showBadge) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(Color.Red, androidx.compose.foundation.shape.CircleShape)
+                            .align(Alignment.TopEnd)
+                    )
+                }
+            }
             Spacer(Modifier.width(12.dp))
             Text(text, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
         }
@@ -173,6 +186,6 @@ private fun MenuButton(icon: ImageVector, text: String, onClick: () -> Unit) {
 @Composable
 private fun MainMenuScreenPreview() {
     BlockQuestTheme {
-        Surface { MainMenuScreen(onPlayClicked = {}, onMissionsClicked = {}, onCosmeticsClicked = {}) }
+        Surface { MainMenuScreen(onPlayClicked = {}, onMissionsClicked = {}, onCosmeticsClicked = {}, onStoreClicked = {}, onSettingsClicked = {}) }
     }
 }

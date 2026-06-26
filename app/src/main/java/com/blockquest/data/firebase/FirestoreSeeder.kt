@@ -80,7 +80,7 @@ object FirestoreSeeder {
                 "displayName" to "Pradera",
                 "tagline" to "El inicio del viaje",
                 "themeName" to "pradera",
-                "levelCount" to 10,
+                "levelCount" to 30,
                 "unlockLevelId" to null,
                 "unlockStarsRequired" to 0,
                 "ambientMusicId" to null,
@@ -93,9 +93,9 @@ object FirestoreSeeder {
                 "displayName" to "Desierto",
                 "tagline" to "El calor del desafío",
                 "themeName" to "desierto",
-                "levelCount" to 10,
-                "unlockLevelId" to "world0_level10",
-                "unlockStarsRequired" to 15,
+                "levelCount" to 30,
+                "unlockLevelId" to "world0_level30",
+                "unlockStarsRequired" to 90,
                 "ambientMusicId" to null,
                 "backgroundImageId" to null,
                 "schemaVersion" to 1,
@@ -106,9 +106,9 @@ object FirestoreSeeder {
                 "displayName" to "Bosque",
                 "tagline" to "La profundidad del verde",
                 "themeName" to "bosque",
-                "levelCount" to 10,
-                "unlockLevelId" to "world1_level10",
-                "unlockStarsRequired" to 45,
+                "levelCount" to 30,
+                "unlockLevelId" to "world1_level60",
+                "unlockStarsRequired" to 90,
                 "ambientMusicId" to null,
                 "backgroundImageId" to null,
                 "schemaVersion" to 1,
@@ -134,140 +134,64 @@ object FirestoreSeeder {
     //              cross_5x5, scythe
     // ─────────────────────────────────────────────────────────────────
 
-    private suspend fun seedLevels(firestore: FirebaseFirestore) {
+        private suspend fun seedLevels(firestore: FirebaseFirestore) {
         val levels = buildList {
-            // ── Mundo 0 — Pradera (10 niveles, dificultad progresiva) ──
-            add(level(
-                id = "world0_level1", number = 1, world = 0,
-                targetScore = 300, timeLimit = 0.0,
-                piecePool = listOf("dot_1x1", "line_h1x2", "line_v2x1", "square_2x2"),
-                rewardCoins = 50, difficulty = 1.0,
-            ))
-            add(level(
-                id = "world0_level2", number = 2, world = 0,
-                targetScore = 500, timeLimit = 0.0,
-                piecePool = listOf("line_h1x2", "line_v2x1", "line_h1x3", "line_v3x1", "square_2x2"),
-                rewardCoins = 60, difficulty = 1.2,
-            ))
-            add(level(
-                id = "world0_level3", number = 3, world = 0,
-                targetScore = 800, timeLimit = 0.0,
-                piecePool = listOf("line_h1x3", "line_v3x1", "square_2x2", "l_corner_s"),
-                rewardCoins = 70, difficulty = 1.5,
-            ))
-            add(level(
-                id = "world0_level4", number = 4, world = 0,
-                targetScore = 1000, timeLimit = 0.0,
-                piecePool = listOf("line_h1x3", "line_v3x1", "square_2x2", "l_corner_s", "t_block"),
-                rewardCoins = 80, difficulty = 1.8,
-            ))
-            add(level(
-                id = "world0_level5", number = 5, world = 0,
-                targetScore = 1500, timeLimit = 0.0,
-                piecePool = listOf("line_h1x3", "line_v3x1", "line_h1x4", "square_2x2", "t_block", "s_block"),
-                rewardCoins = 100, rewardGems = 1, difficulty = 2.0,
-                isMilestone = true,
-                rewardSkinId = null,
-            ))
-            add(level(
-                id = "world0_level6", number = 6, world = 0,
-                targetScore = 2000, timeLimit = 0.0,
-                piecePool = listOf("line_h1x3", "line_v3x1", "line_h1x4", "line_v4x1", "t_block", "s_block", "z_block"),
-                rewardCoins = 110, difficulty = 2.3,
-            ))
-            add(level(
-                id = "world0_level7", number = 7, world = 0,
-                targetScore = 2500, timeLimit = 60.0,
-                piecePool = listOf("line_h1x3", "line_v3x1", "square_2x2", "t_block", "l_corner_s", "l_corner_l"),
-                rewardCoins = 120, difficulty = 2.6,
-            ))
-            add(level(
-                id = "world0_level8", number = 8, world = 0,
-                targetScore = 3000, timeLimit = 60.0,
-                piecePool = listOf("line_h1x4", "line_v4x1", "square_2x2", "square_3x3", "t_block", "s_block"),
-                rewardCoins = 130, difficulty = 2.9,
-            ))
-            add(level(
-                id = "world0_level9", number = 9, world = 0,
-                targetScore = 3500, timeLimit = 90.0,
-                piecePool = listOf("line_h1x4", "line_v4x1", "square_2x2", "t_block", "l_corner_l", "u_shape"),
-                rewardCoins = 150, difficulty = 3.2,
-            ))
-            add(level(
-                id = "world0_level10", number = 10, world = 0,
-                targetScore = 5000, timeLimit = 120.0,
-                piecePool = listOf("line_h1x4", "line_v4x1", "square_3x3", "t_block", "l_corner_l", "u_shape", "cross_5x5"),
-                rewardCoins = 200, rewardGems = 5, difficulty = 4.0,
-                isMilestone = true, isBoss = false,
-                rewardSkinId = "bosque",
-            ))
-
-            // ── Mundo 1 — Desierto (10 niveles) ──
-            add(level(
-                id = "world1_level1", number = 1, world = 1,
-                targetScore = 2000, timeLimit = 0.0,
-                piecePool = listOf("line_h1x3", "line_v3x1", "square_2x2", "t_block", "s_block"),
-                rewardCoins = 120, difficulty = 3.0,
-            ))
-            add(level(
-                id = "world1_level2", number = 2, world = 1,
-                targetScore = 3000, timeLimit = 0.0,
-                piecePool = listOf("line_h1x3", "line_v3x1", "line_h1x4", "t_block", "l_corner_s", "z_block"),
-                rewardCoins = 130, difficulty = 3.3,
-            ))
-            add(level(
-                id = "world1_level3", number = 3, world = 1,
-                targetScore = 4000, timeLimit = 0.0,
-                piecePool = listOf("line_h1x4", "line_v4x1", "square_2x2", "t_block", "l_corner_l", "s_block"),
-                rewardCoins = 140, difficulty = 3.6,
-            ))
-            add(level(
-                id = "world1_level4", number = 4, world = 1,
-                targetScore = 5000, timeLimit = 90.0,
-                piecePool = listOf("line_h1x4", "line_v4x1", "square_3x3", "t_block", "l_corner_l", "u_shape"),
-                rewardCoins = 150, difficulty = 3.9,
-            ))
-            add(level(
-                id = "world1_level5", number = 5, world = 1,
-                targetScore = 6000, timeLimit = 90.0,
-                piecePool = listOf("line_h1x4", "line_v4x1", "square_3x3", "t_block", "u_shape", "rect_2x4"),
-                rewardCoins = 180, rewardGems = 2, difficulty = 4.2,
-                isMilestone = true,
-            ))
-            add(level(
-                id = "world1_level6", number = 6, world = 1,
-                targetScore = 7000, timeLimit = 90.0,
-                piecePool = listOf("line_h1x5", "line_v5x1", "square_3x3", "t_block", "l_corner_l", "u_shape"),
-                rewardCoins = 190, difficulty = 4.5,
-            ))
-            add(level(
-                id = "world1_level7", number = 7, world = 1,
-                targetScore = 8000, timeLimit = 120.0,
-                piecePool = listOf("line_h1x5", "line_v5x1", "square_3x3", "t_block", "l_corner_l", "scythe"),
-                rewardCoins = 200, difficulty = 4.8,
-            ))
-            add(level(
-                id = "world1_level8", number = 8, world = 1,
-                targetScore = 9000, timeLimit = 120.0,
-                piecePool = listOf("line_h1x5", "line_v5x1", "square_3x3", "u_shape", "rect_2x4", "scythe"),
-                rewardCoins = 210, difficulty = 5.1,
-            ))
-            add(level(
-                id = "world1_level9", number = 9, world = 1,
-                targetScore = 10000, timeLimit = 120.0,
-                piecePool = listOf("line_h1x5", "line_v5x1", "square_3x3", "t_block", "u_shape", "cross_5x5"),
-                rewardCoins = 220, difficulty = 5.4,
-            ))
-            add(level(
-                id = "world1_level10", number = 10, world = 1,
-                targetScore = 15000, timeLimit = 150.0,
-                piecePool = listOf("line_h1x5", "line_v5x1", "square_3x3", "t_block", "u_shape", "cross_5x5", "scythe"),
-                rewardCoins = 300, rewardGems = 8, difficulty = 6.0,
-                isMilestone = true,
-                rewardSkinId = "desierto",
-            ))
+            // Mundo 0 - Pradera (1-30)
+            for (i in 1..30) {
+                val isTutorial = i <= 4
+                val isSpecial = i == 10 || i == 20
+                val isBoss = i == 30
+                add(level(
+                    id = "world0_level$i", number = i, world = 0,
+                    targetScore = if (isTutorial) 300 * i else 1000 * i,
+                    timeLimit = if (isSpecial || isBoss) (if (isBoss) 120.0 else 60.0) else 0.0,
+                    piecePool = if (isBoss) listOf("line_h1x5", "square_3x3", "cross_5x5") else listOf("line_h1x2", "square_2x2"),
+                    rewardCoins = if (isBoss) 200 else if (isSpecial) 100 else 50,
+                    rewardGems = if (isBoss) 5 else if (isSpecial) 2 else 0,
+                    difficulty = 1.0 + (i * 0.1),
+                    isMilestone = isSpecial || isBoss,
+                    isBoss = isBoss,
+                    levelType = if (isTutorial) "Tutorial" else if (isSpecial) "Challenge" else if (isBoss) "Boss" else "Standard"
+                ))
+            }
+            // Mundo 1 - Bosque (31-60)
+            for (i in 31..60) {
+                val isTutorial = i <= 34
+                val isSpecial = i == 40 || i == 50
+                val isBoss = i == 60
+                add(level(
+                    id = "world1_level$i", number = i, world = 1,
+                    targetScore = if (isTutorial) 500 * (i-30) else 1500 * (i-30),
+                    timeLimit = if (isSpecial || isBoss) (if (isBoss) 150.0 else 90.0) else 0.0,
+                    piecePool = if (isBoss) listOf("line_h1x5", "square_3x3", "cross_5x5", "u_shape") else listOf("line_h1x3", "square_2x2", "t_block"),
+                    rewardCoins = if (isBoss) 300 else if (isSpecial) 150 else 75,
+                    rewardGems = if (isBoss) 10 else if (isSpecial) 3 else 0,
+                    difficulty = 2.0 + ((i-30) * 0.15),
+                    isMilestone = isSpecial || isBoss,
+                    isBoss = isBoss,
+                    levelType = if (isTutorial) "Tutorial" else if (isSpecial) "Challenge" else if (isBoss) "Boss" else "Standard"
+                ))
+            }
+            // Mundo 2 - Desierto (61-90)
+            for (i in 61..90) {
+                val isTutorial = i <= 64
+                val isSpecial = i == 70 || i == 80
+                val isBoss = i == 90
+                add(level(
+                    id = "world2_level$i", number = i, world = 2,
+                    targetScore = if (isTutorial) 800 * (i-60) else 2000 * (i-60),
+                    timeLimit = if (isSpecial || isBoss) (if (isBoss) 180.0 else 100.0) else 0.0,
+                    piecePool = if (isBoss) listOf("line_h1x5", "square_3x3", "cross_5x5", "scythe", "z_block") else listOf("line_h1x4", "square_2x2", "l_corner_s"),
+                    rewardCoins = if (isBoss) 400 else if (isSpecial) 200 else 100,
+                    rewardGems = if (isBoss) 15 else if (isSpecial) 5 else 0,
+                    difficulty = 3.0 + ((i-60) * 0.2),
+                    isMilestone = isSpecial || isBoss,
+                    isBoss = isBoss,
+                    levelType = if (isTutorial) "Tutorial" else if (isSpecial) "Challenge" else if (isBoss) "Boss" else "Standard"
+                ))
+            }
         }
-
+        
         levels.forEach { level ->
             firestore.collection("levels")
                 .document(level["levelId"] as String)
@@ -277,61 +201,6 @@ object FirestoreSeeder {
         Timber.d("FirestoreSeeder: levels seeded (${levels.size})")
     }
 
-    /** Helper para construir un mapa de nivel con valores por defecto correctos. */
-    private fun level(
-        id: String,
-        number: Int,
-        world: Int,
-        targetScore: Int,
-        timeLimit: Double,
-        piecePool: List<String>,
-        rewardCoins: Int = 50,
-        rewardGems: Int = 0,
-        difficulty: Double = 1.0,
-        isMilestone: Boolean = false,
-        isBoss: Boolean = false,
-        rewardSkinId: String? = null,
-        rewardTitleId: String? = null,
-        objective: String = "ScoreTarget",
-        levelType: String = "Standard",
-        targetComboCount: Int = 0,
-        boardWidth: Int = 8,
-        boardHeight: Int = 8,
-    ): Map<String, Any?> = mapOf(
-        "levelId" to id,
-        "levelNumber" to number,
-        "worldIndex" to world,
-        "levelType" to levelType,
-        "objective" to objective,
-        "targetScore" to targetScore,
-        "timeLimitSeconds" to timeLimit,
-        "targetComboCount" to targetComboCount,
-        // boardSize es un map anidado — así lo espera BoardSizeDto
-        "boardSize" to mapOf("width" to boardWidth, "height" to boardHeight),
-        "preFilled" to emptyList<Map<String, Int>>(),
-        "piecePool" to piecePool,
-        "guaranteedPiece" to null,
-        "guaranteedInHand" to -1,
-        "rewardCoins" to rewardCoins,
-        "rewardGems" to rewardGems,
-        "rewardSkinId" to rewardSkinId,
-        "rewardTitleId" to rewardTitleId,
-        "isMilestone" to isMilestone,
-        "isBoss" to isBoss,
-        "silverMultiplier" to 1.25,
-        "goldMultiplier" to 1.5,
-        "bossConfig" to null,
-        "difficultyScore" to difficulty,
-        "schemaVersion" to 1,
-    )
-
-    // ─────────────────────────────────────────────────────────────────
-    // MISSIONS — campos exactos de MissionDto
-    // type: PlacePieces | ClearLines | ClearSquares | ScoreTarget |
-    //       CompleteLevel | ComboChain | UseHeat
-    // cadence: Daily | Weekly | Achievement
-    // ─────────────────────────────────────────────────────────────────
-
     private suspend fun seedMissions(firestore: FirebaseFirestore) {
         val missions = listOf(
             // ── Diarias ──
@@ -339,11 +208,11 @@ object FirestoreSeeder {
                 "Coloca 50 piezas en cualquier nivel", rewardCoins = 30),
             mission("daily_clear_5_lines", "ClearLines", 5, "Daily",
                 "Limpia 5 líneas en un día", rewardCoins = 50),
-            mission("daily_score_2000", "ScoreTarget", 2000, "Daily",
+            mission("daily_score_2000", "ReachScore", 2000, "Daily",
                 "Alcanza 2,000 puntos en cualquier nivel", rewardCoins = 40),
-            mission("daily_combo_3", "ComboChain", 3, "Daily",
+            mission("daily_combo_3", "AchieveCombos", 3, "Daily",
                 "Logra 3 combos en un día", rewardCoins = 60),
-            mission("daily_complete_3", "CompleteLevel", 3, "Daily",
+            mission("daily_complete_3", "CompleteLevels", 3, "Daily",
                 "Completa 3 niveles en un día", rewardCoins = 70),
 
             // ── Semanales ──
@@ -351,30 +220,43 @@ object FirestoreSeeder {
                 "Coloca 500 piezas esta semana", rewardCoins = 150, rewardGems = 2),
             mission("weekly_clear_50_lines", "ClearLines", 50, "Weekly",
                 "Limpia 50 líneas esta semana", rewardCoins = 200, rewardGems = 3),
-            mission("weekly_complete_15", "CompleteLevel", 15, "Weekly",
+            mission("weekly_complete_15", "CompleteLevels", 15, "Weekly",
                 "Completa 15 niveles esta semana", rewardCoins = 250, rewardGems = 5),
-            mission("weekly_score_20000", "ScoreTarget", 20000, "Weekly",
+            mission("weekly_score_20000", "ReachScore", 20000, "Weekly",
                 "Acumula 20,000 puntos esta semana", rewardCoins = 180, rewardGems = 2),
 
             // ── Logros (Achievement) ──
-            mission("ach_first_level", "CompleteLevel", 1, "Achievement",
+            mission("ach_first_level", "CompleteLevels", 1, "Achievement",
                 "Completa tu primer nivel", rewardCoins = 100,
                 rewardTitleId = "novata"),
-            mission("ach_complete_10", "CompleteLevel", 10, "Achievement",
+            mission("ach_complete_10", "CompleteLevels", 10, "Achievement",
                 "Completa 10 niveles", rewardCoins = 200,
                 rewardTitleId = "bloquera"),
             mission("ach_place_1000", "PlacePieces", 1000, "Achievement",
                 "Coloca 1,000 piezas en total", rewardCoins = 300),
             mission("ach_clear_100_lines", "ClearLines", 100, "Achievement",
                 "Limpia 100 líneas en total", rewardCoins = 400, rewardGems = 10),
-            mission("ach_ultra_combo", "ComboChain", 1, "Achievement",
+            mission("ach_ultra_combo", "AchieveCombos", 1, "Achievement",
                 "Logra un combo Ultra (6x)", rewardCoins = 500,
                 rewardTitleId = "combo_master"),
             mission("ach_clear_10_squares", "ClearSquares", 10, "Achievement",
                 "Limpia 10 cuadros 3x3", rewardCoins = 250, rewardGems = 5),
-            mission("ach_complete_world0", "CompleteLevel", 10, "Achievement",
+            mission("ach_complete_world0", "CompleteWorld", 1, "Achievement",
                 "Completa todos los niveles de Pradera", rewardCoins = 600, rewardGems = 15,
-                rewardSkinId = null),
+                worldIndex = 0),
+            mission("ach_complete_world1", "CompleteWorld", 1, "Achievement",
+                "Completa todos los niveles de Desierto", rewardCoins = 800, rewardGems = 20,
+                worldIndex = 1),
+            mission("ach_complete_world2", "CompleteWorld", 1, "Achievement",
+                "Completa todos los niveles de Bosque", rewardCoins = 1000, rewardGems = 25,
+                worldIndex = 2),
+            mission("ach_combo_50", "AchieveCombos", 50, "Achievement",
+                "Logra 50 combos", rewardCoins = 400, rewardGems = 10),
+            mission("ach_streak_7", "ClaimDailyStreak", 7, "Achievement",
+                "Reclama 7 recompensas diarias seguidas", rewardCoins = 500, rewardGems = 15),
+            mission("ach_space_streak", "AchieveStreak", 20, "Achievement",
+                "Consigue una racha de 20 movimientos seguidos", rewardCoins = 1000, rewardGems = 50,
+                rewardSkinId = "espacio"),
         )
 
         missions.forEach { m ->

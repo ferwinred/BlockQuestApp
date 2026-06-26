@@ -29,6 +29,7 @@ data class MainMenuUiState(
     val dailyReward: DailyRewardState = DailyRewardState(),
     val dailyRewardConfig: DailyRewardConfig? = null,
     val dailyRewardAvailable: Boolean = false,
+    val hasUnclaimedMissions: Boolean = false,
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
 )
@@ -36,9 +37,12 @@ data class MainMenuUiState(
 @HiltViewModel
 class MainMenuViewModel @Inject constructor(
     observeCurrency: ObserveCurrencyUseCase,
+    observeMissions: com.blockquest.domain.usecase.ObserveMissionsUseCase,
     private val claimDailyRewardUseCase: ClaimDailyRewardUseCase,
     private val ensureSignedIn: EnsureSignedInUseCase,
     private val dailyRewardConfigRepo: DailyRewardConfigRepository,
+    private val rollDailyMissions: com.blockquest.domain.usecase.RollDailyMissionsUseCase,
+    private val rollWeeklyMissions: com.blockquest.domain.usecase.RollWeeklyMissionsUseCase,
 ) : ViewModel() {
 
     private val _dailyReward = MutableStateFlow(DailyRewardState())
@@ -48,17 +52,20 @@ class MainMenuViewModel @Inject constructor(
         observeCurrency(),
         _dailyReward,
         dailyRewardConfigRepo.observeConfig(),
+        observeMissions(),
         _errorMessage,
-    ) { currency, daily, config, errorMsg ->
+    ) { currency, daily, config, missions, errorMsg ->
         val now      = System.currentTimeMillis()
         val oneDayMs = config.cooldownMs
         val available = daily.lastClaimed == 0L ||
                 (now - daily.lastClaimed) >= oneDayMs
+        val hasUnclaimed = missions.any { it.isCompleted && !it.isClaimed }
         MainMenuUiState(
             currency             = currency,
             dailyReward          = daily,
             dailyRewardConfig    = config,
             dailyRewardAvailable = available,
+            hasUnclaimedMissions = hasUnclaimed,
             isLoading            = false,
             errorMessage         = errorMsg,
         )
@@ -72,8 +79,10 @@ class MainMenuViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching {
                 ensureSignedIn()
+                rollDailyMissions()
+                rollWeeklyMissions()
             }.onFailure { e ->
-                _errorMessage.value = e.message ?: "Authentication failed"
+                _errorMessage.value = e.message ?: "Initialization failed"
             }
         }
     }

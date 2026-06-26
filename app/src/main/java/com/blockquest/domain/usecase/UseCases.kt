@@ -35,6 +35,7 @@ import com.blockquest.domain.repository.WorldRepository
 import com.blockquest.domain.scoring.DailyRewardService
 import com.blockquest.domain.scoring.LevelRewardService
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
 
@@ -51,6 +52,7 @@ class CompleteLevelUseCase @Inject constructor (
     private val progression: ProgressionRepository,
     private val players: PlayerRepository,
     private val analytics: AnalyticsRepository,
+    private val leaderboard: com.blockquest.domain.repository.LeaderboardRepository
 ) {
     /**
      * Persist the result of a level attempt and grant the
@@ -65,6 +67,7 @@ class CompleteLevelUseCase @Inject constructor (
         rewardCoins: Int,
         rewardGems: Int,
     ) {
+        val currentProgress = kotlinx.coroutines.flow.first(progression.observeLevelProgress(levelId))
         progression.recordLevelResult(
             LevelResult(levelId, completed = true, stars = stars, bestScore = finalScore, attempts = 1)
         )
@@ -74,6 +77,11 @@ class CompleteLevelUseCase @Inject constructor (
             "level_complete",
             mapOf("level_id" to levelId, "score" to finalScore, "stars" to stars),
         )
+        if (currentProgress == null || finalScore > currentProgress.bestScore) {
+            val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+            val displayName = auth.currentUser?.displayName ?: "Jugador"
+            leaderboard.submitScore(levelId, finalScore, displayName)
+        }
     }
 }
 

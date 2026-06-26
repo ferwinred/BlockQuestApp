@@ -76,6 +76,7 @@ import com.blockquest.domain.model.Cell
 import com.blockquest.domain.model.CellState
 import com.blockquest.domain.model.ComboType
 import com.blockquest.domain.model.PieceShape
+import com.blockquest.domain.model.LevelType
 import com.blockquest.domain.usecase.GameEvent
 import com.blockquest.domain.usecase.GameState
 import com.blockquest.presentation.ui.screen.gameplay.drag.DragController
@@ -89,12 +90,14 @@ import kotlin.time.Duration.Companion.milliseconds
 @Composable
 fun GameplayScreen(
     levelId: String,
+    initialBoosters: List<String> = emptyList(),
     onExit: () -> Unit,
     viewModel: GameplayViewModel = hiltViewModel(),
 ) {
     val _ignore = levelId
     val state by viewModel.state.collectAsStateWithLifecycle()
     val ui by viewModel.ui.collectAsStateWithLifecycle()
+    val currency by viewModel.currency.collectAsStateWithLifecycle(initialValue = com.blockquest.domain.model.CurrencyState())
     val dragController = remember { DragController() }
     val dragState by dragController.state.collectAsStateWithLifecycle()
     val level = state.level
@@ -104,6 +107,7 @@ fun GameplayScreen(
     var comboBurstKey   by remember { mutableStateOf<Any?>(null) }
     var lastScoreDelta  by remember { mutableIntStateOf(0) }
     var scoreTrigger    by remember { mutableStateOf<Any?>(null) }
+    var showTutorial by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -205,7 +209,33 @@ fun GameplayScreen(
                     fontWeight = FontWeight.Medium
                 )
 
-                TrayRow(
+                if (initialBoosters.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    initialBoosters.forEach { boosterId ->
+                        val count = currency.boosters[boosterId] ?: 0
+                        val name = when(boosterId) {
+                            "booster_bomb" -> "Bomba"
+                            "booster_reroll" -> "Mano"
+                            "booster_smart_move" -> "Auto"
+                            "booster_double_score" -> "x2"
+                            "booster_time_freeze" -> "Reloj"
+                            else -> boosterId
+                        }
+                        Button(
+                            onClick = { if (count > 0) viewModel.useBooster(boosterId) },
+                            enabled = count > 0,
+                            modifier = Modifier.height(40.dp)
+                        ) {
+                            Text("${name} (${count})", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+            
+            TrayRow(
                     tray = state.tray,
                     selectedIndex = if (dragState.isDragging) dragState.trayIndex else -1,
                     onPieceTap = { /* tap-tap path */ },

@@ -37,8 +37,9 @@ object LevelRewardService {
     fun rewardsFor(level: LevelSpec, stars: Int, isFirstClear: Boolean): LevelReward {
         require(stars in 0..3) { "stars must be 0..3" }
 
-        val baseCoins = level.rewardCoins
-        val baseGems = level.rewardGems
+        // Increase base rewards by 20% for better economy balance
+        val baseCoins = (level.rewardCoins * 1.2f).toInt()
+        val baseGems = (level.rewardGems * 1.2f).toInt()
         val starMultiplier = when (stars) {
             3 -> level.goldMultiplier
             2 -> level.silverMultiplier

@@ -113,46 +113,16 @@ class GameplayViewModel @Inject constructor(
     private val _isAdInProgress = MutableStateFlow(false)
     val isAdInProgress: StateFlow<Boolean> = _isAdInProgress
 
-    // Tick the engine using a standard coroutine delay for timing.
-    // withFrameNanos is only for UI-bound animations.
-    init {
-        viewModelScope.launch {
-            var lastMs = System.currentTimeMillis()
-            while (true) {
-                val now = System.currentTimeMillis()
-                val delta = now - lastMs
-                if (delta > 0) {
-                    tick(delta)
-                }
-                lastMs = now
-                kotlinx.coroutines.delay(16) // ~60 FPS
-            }
-        }
-    }
-
     private val _lastStats = MutableStateFlow<PlacementResult.Accepted?>(null)
     val lastStats: StateFlow<PlacementResult.Accepted?> = _lastStats
 
     init {
+        // 1. Preload rewarded ad concurrently
         viewModelScope.launch {
             preloadRewardedAd(AdPlacement.ContinueAfterGameOver)
         }
-        
-        viewModelScope.launch {
-            runCatching {
-                val level = getLevel(levelId) ?: error("Level $levelId not found")
-                engine.startLevel(level, attempt = 1)
-                analytics.logEvent("level_start", mapOf("level_id" to levelId))
-            }.onFailure { t ->
-                _ui.value = _ui.value.copy(
-                    isLoading = false,
-                    errorMessage = t.message,
-                )
-            }.onSuccess {
-                _ui.value = _ui.value.copy(isLoading = false)
-            }
-        }
 
+        // 2. Start collecting events BEFORE the level starts to avoid missing events
         viewModelScope.launch {
             engine.events.collect { event ->
                 when (event) {
@@ -192,6 +162,34 @@ class GameplayViewModel @Inject constructor(
                 }
             }
         }
+
+        // 3. Fetch level, start it, and THEN begin the game tick loop
+        viewModelScope.launch {
+            runCatching {
+                val level = getLevel(levelId) ?: error("Level $levelId not found")
+                engine.startLevel(level, attempt = 1)
+                analytics.logEvent("level_start", mapOf("level_id" to levelId))
+            }.onFailure { t ->
+                _ui.value = _ui.value.copy(
+                    isLoading = false,
+                    errorMessage = t.message,
+                )
+            }.onSuccess {
+                _ui.value = _ui.value.copy(isLoading = false)
+
+                // Start game tick loop
+                var lastMs = System.currentTimeMillis()
+                while (true) {
+                    val now = System.currentTimeMillis()
+                    val delta = now - lastMs
+                    if (delta > 0) {
+                        tick(delta)
+                    }
+                    lastMs = now
+                    kotlinx.coroutines.delay(16) // ~60 FPS
+                }
+            }
+        }
     }
 
     fun place(trayIndex: Int, col: Int, row: Int) {
@@ -221,16 +219,21 @@ class GameplayViewModel @Inject constructor(
     fun continueWithAd() {
         viewModelScope.launch {
             _isAdInProgress.value = true
-            val result = showRewardedAd(AdPlacement.ContinueAfterGameOver) { amount ->
-                engine.continueWithExtraPieces(amount)
-                _ui.value = _ui.value.copy(pendingOverlay = GameplayOverlay.None)
-            }
+            val result = kotlinx.coroutines.withTimeoutOrNull(5000L) {
+                showRewardedAd(AdPlacement.ContinueAfterGameOver) { amount ->
+                    engine.continueWithExtraPieces(amount)
+                    _ui.value = _ui.value.copy(pendingOverlay = GameplayOverlay.None)
+                }
+            } ?: AdResult.Failed("timeout")
             _isAdInProgress.value = false
             if (result is AdResult.Failed) {
                 analytics.logEvent(
                     "ad_continue_failed",
                     mapOf("reason" to result.reason),
                 )
+                // Fallback a gems propuesto por el Roadmap
+                // Idealmente la UI intercepta el error, pero podemos actualizar el overlay
+                // para que el jugador intente con gemas
             }
         }
     }

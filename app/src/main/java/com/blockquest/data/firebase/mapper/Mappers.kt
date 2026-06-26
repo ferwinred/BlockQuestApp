@@ -139,7 +139,7 @@ fun LevelDto.toDomain(): LevelSpec? {
         timeLimitSeconds = timeLimitSeconds.toFloat(),
         targetComboCount = targetComboCount,
         boardSize = boardSize.width to boardSize.height,
-        preFilled = preFilled.map { Cell(it.col, it.row) },
+        preFilled = preFilled.map { Cell(it.col, it.row, it.type) },
         piecePool = shapePool,
         guaranteedPiece = guaranteed,
         guaranteedInHand = guaranteedInHand,

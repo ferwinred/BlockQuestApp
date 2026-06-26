@@ -194,6 +194,14 @@ abstract class RepositoryModule {
     @dagger.Binds
     @Singleton
     abstract fun bindPieceRepository(impl: com.blockquest.data.local.LocalPieceRepository): PieceRepository
+
+    @dagger.Binds
+    @Singleton
+    abstract fun bindSettingsRepository(impl: com.blockquest.data.local.LocalSettingsRepository): com.blockquest.domain.repository.SettingsRepository
+
+    @dagger.Binds
+    @Singleton
+    abstract fun bindLeaderboardRepository(impl: com.blockquest.data.firebase.FirebaseLeaderboardRepository): com.blockquest.domain.repository.LeaderboardRepository
 }
 
 @Module

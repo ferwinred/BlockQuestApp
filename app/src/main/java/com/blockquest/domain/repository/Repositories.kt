@@ -97,6 +97,8 @@ interface PlayerRepository {
      * "level_complete", "iap_pack_welcome", etc. — used by
      * analytics.
      */
+    suspend fun addBooster(boosterId: String, amount: Int)
+    suspend fun consumeBooster(boosterId: String)
     suspend fun addCoins(amount: Int, source: String)
 
     /**
@@ -115,6 +117,16 @@ interface PlayerRepository {
      * credential). Idempotent. Returns the resulting user id.
      */
     suspend fun ensureSignedIn(): String
+
+    /**
+     * Link the current anonymous account with a Google account.
+     */
+    suspend fun linkWithGoogle(idToken: String): Result<Unit>
+
+    /**
+     * Link the current anonymous account with an Email/Password.
+     */
+    suspend fun linkWithEmail(email: String, pass: String): Result<Unit>
 }
 
 interface AnalyticsRepository {

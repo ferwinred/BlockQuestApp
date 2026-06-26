@@ -27,11 +27,13 @@ object Routes {
     const val WORLD_MAP    = "world_map"
     const val MISSIONS     = "missions"
     const val COSMETICS    = "cosmetics"
+    const val STORE        = "store"
+    const val SETTINGS     = "settings"
     const val LEVEL_SELECT = "level_select/{worldIndex}"
-    const val GAMEPLAY     = "gameplay/{levelId}"
+    const val GAMEPLAY     = "gameplay/{levelId}?boosters={boosters}"
 
     fun levelSelect(worldIndex: Int) = "level_select/$worldIndex"
-    fun gameplay(levelId: String)    = "gameplay/$levelId"
+    fun gameplay(levelId: String, boosters: List<String> = emptyList()) = "gameplay/$levelId?boosters=${boosters.joinToString(",")}"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,6 +47,8 @@ fun BlockQuestNavGraph() {
                 onPlayClicked      = { nav.navigate(Routes.WORLD_MAP) },
                 onMissionsClicked  = { nav.navigate(Routes.MISSIONS) },
                 onCosmeticsClicked = { nav.navigate(Routes.COSMETICS) },
+                onStoreClicked     = { nav.navigate(Routes.STORE) },
+                onSettingsClicked  = { nav.navigate(Routes.SETTINGS) },
             )
         }
 
@@ -65,8 +69,8 @@ fun BlockQuestNavGraph() {
                 ?.toIntOrNull() ?: 0
             LevelSelectScreen(
                 worldIndex      = worldIndex,
-                onLevelSelected = { levelId ->
-                    nav.navigate(Routes.gameplay(levelId))
+                onLevelSelected = { levelId, boosters ->
+                    nav.navigate(Routes.gameplay(levelId, boosters))
                 },
                 onBack = { nav.popBackStack() },
                 onMissionsClick = { nav.navigate(Routes.MISSIONS) }
@@ -103,10 +107,28 @@ fun BlockQuestNavGraph() {
             CosmeticsScreen(onBack = { nav.popBackStack() })
         }
 
+        composable(Routes.STORE) {
+            com.blockquest.presentation.ui.screen.store.StoreScreen(
+                onBack = { nav.popBackStack() },
+                onPurchaseGems = { _ -> 
+                    // TODO: Implement mock purchase with PlayerRepository later
+                }
+            )
+        }
+
+        composable(Routes.SETTINGS) {
+            com.blockquest.presentation.ui.screen.settings.SettingsScreen(
+                onBack = { nav.popBackStack() }
+            )
+        }
+
         composable(Routes.GAMEPLAY) { entry ->
             val levelId = entry.arguments?.getString("levelId") ?: return@composable
+            val boostersStr = entry.arguments?.getString("boosters")
+            val boosters = if (boostersStr.isNullOrEmpty()) emptyList() else boostersStr.split(",")
             GameplayScreen(
                 levelId = levelId,
+                initialBoosters = boosters,
                 onExit  = { nav.popBackStack() },
             )
         }

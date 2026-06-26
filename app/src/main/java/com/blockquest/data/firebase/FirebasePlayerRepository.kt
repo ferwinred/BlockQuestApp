@@ -10,11 +10,15 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.blockquest.data.firebase.dto.CurrencyDto
 import com.blockquest.data.firebase.dto.DailyRewardDto
 import com.blockquest.data.firebase.dto.PlayerDto
 import com.blockquest.data.firebase.mapper.toDomain
 import com.blockquest.data.firebase.mapper.toDto
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import com.blockquest.domain.model.CurrencyState
 import com.blockquest.domain.model.DailyRewardClaimed
 import com.blockquest.domain.model.DailyRewardState
@@ -48,17 +52,57 @@ class FirebasePlayerRepository @Inject constructor(
     private val keyUserId = stringPreferencesKey("user_id")
     private val keyCoins = longPreferencesKey("coins")
     private val keyGems = longPreferencesKey("gems")
+    private val keyBoosters = stringPreferencesKey("boosters")
     private val keyLastDailyClaim = longPreferencesKey("daily_claim_ms")
     private val keyDailyStreak = longPreferencesKey("daily_streak")
 
     override fun observeCurrency(): Flow<CurrencyState> = localStore.data
         .map { prefs ->
+            val boostersJson = prefs[keyBoosters] ?: "{}"
+            val boostersMap = try {
+                Json.decodeFromString<Map<String, Int>>(boostersJson)
+            } catch (e: Exception) {
+                emptyMap()
+            }
             CurrencyState(
                 coins = prefs[keyCoins]?.toInt() ?: 0,
                 gems = prefs[keyGems]?.toInt() ?: 0,
+                boosters = boostersMap
             )
         }
         .distinctUntilChanged()
+
+    
+    override suspend fun addBooster(boosterId: String, amount: Int) {
+        localStore.edit { prefs ->
+            val boostersJson = prefs[keyBoosters] ?: "{}"
+            val map = try {
+                Json.decodeFromString<Map<String, Int>>(boostersJson).toMutableMap()
+            } catch (e: Exception) {
+                mutableMapOf()
+            }
+            map[boosterId] = (map[boosterId] ?: 0) + amount
+            prefs[keyBoosters] = Json.encodeToString(map)
+        }
+        syncToFirebase()
+    }
+    
+    override suspend fun consumeBooster(boosterId: String) {
+        localStore.edit { prefs ->
+            val boostersJson = prefs[keyBoosters] ?: "{}"
+            val map = try {
+                Json.decodeFromString<Map<String, Int>>(boostersJson).toMutableMap()
+            } catch (e: Exception) {
+                mutableMapOf()
+            }
+            val current = map[boosterId] ?: 0
+            if (current > 0) {
+                map[boosterId] = current - 1
+            }
+            prefs[keyBoosters] = Json.encodeToString(map)
+        }
+        syncToFirebase()
+    }
 
     override suspend fun addCoins(amount: Int, source: String) {
         if (amount <= 0) return
@@ -199,5 +243,23 @@ class FirebasePlayerRepository @Inject constructor(
             .document(user.uid)
             .set(mapOf("currency" to dto), SetOptions.merge())
             .await()
+    }
+
+    override suspend fun linkWithGoogle(idToken: String): Result<Unit> {
+        return runCatching {
+            val credential = com.google.firebase.auth.GoogleAuthProvider.getCredential(idToken, null)
+            auth.currentUser?.linkWithCredential(credential)?.await()
+            val user = auth.currentUser ?: return@runCatching
+            // Update displayName to match the linked Google account
+            firestore.collection("players").document(user.uid)
+                .set(mapOf("displayName" to (user.displayName ?: "Jugador")), SetOptions.merge())
+        }
+    }
+
+    override suspend fun linkWithEmail(email: String, pass: String): Result<Unit> {
+        return runCatching {
+            val credential = com.google.firebase.auth.EmailAuthProvider.getCredential(email, pass)
+            auth.currentUser?.linkWithCredential(credential)?.await()
+        }
     }
 }

@@ -77,5 +77,6 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.remote.config)
+    implementation(libs.firebase.messaging)
     implementation(libs.kotlinx.serialization.json)
 }

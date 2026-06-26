@@ -186,6 +186,7 @@ sealed class GameEvent {
     data class LevelContinued(val method: String, val extraPieces: Int) : GameEvent()
     data class SpecialCellsCleared(val crystals: Int, val heatLocksSurvived: Int, val blackHoles: Int) : GameEvent()
     data class PowerUpUsed(val powerUpId: String, val levelId: String) : GameEvent()
+    data class BoosterUsed(val boosterId: String) : GameEvent()
     data class CurrencyChanged(val currency: String, val delta: Int, val newTotal: Int, val source: String) : GameEvent()
     data class WorldUnlocked(val worldIndex: Int) : GameEvent()
     data class LevelUnlocked(val levelId: String) : GameEvent()
@@ -213,7 +214,11 @@ class GameplayEngine @Inject constructor (
     fun startLevel(level: LevelSpec, attempt: Int) {
         val board = BoardState(level.boardSize.first, level.boardSize.second)
         level.preFilled.forEach { cell ->
-            board.set(cell.col, cell.row, CellState.Occupied("pre"))
+            if (cell.type == "Crystal") {
+                board.set(cell.col, cell.row, CellState.Crystal(1))
+            } else {
+                board.set(cell.col, cell.row, CellState.Occupied("pre"))
+            }
         }
         undoStack.clear()
         val seed = PiecePoolSelector.deriveSeed(level.levelId, level.worldIndex)
