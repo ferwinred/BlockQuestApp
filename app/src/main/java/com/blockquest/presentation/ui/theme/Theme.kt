@@ -31,23 +31,25 @@ import com.blockquest.presentation.designsystem.SemanticColors
  */
 val LocalSemanticColors = staticCompositionLocalOf { Palettes.GrassLand }
 
-private val GrassGreen = Color(0xFF6BCB77)
-private val ForestEmerald = Color(0xFF2D5A3D)
-private val SandGold = Color(0xFFFFE4A0)
-private val SpaceDeep = Color(0xFF1E1B4B)
+private val GrassGreen = Color(0xFF3E6D43)
+private val LightMint = Color(0xFFEBF5ED)
+private val GoldStar = Color(0xFFFFD93D)
 
 private val LightColors = lightColorScheme(
     primary = GrassGreen,
     onPrimary = Color.White,
     primaryContainer = Color(0xFFD6F5DC),
-    onPrimaryContainer = ForestEmerald,
-    secondary = SandGold,
-    onSecondary = Color(0xFF3A2E00),
-    tertiary = SpaceDeep,
-    background = Color(0xFFFAFCFA),
-    onBackground = Color(0xFF1A1C1A),
-    surface = Color(0xFFF6F8F6),
-    onSurface = Color(0xFF1A1C1A),
+    onPrimaryContainer = GrassGreen,
+    secondary = GoldStar,
+    onSecondary = Color.White,
+    tertiary = Color(0xFF1E1B4B),
+    background = LightMint,
+    onBackground = GrassGreen,
+    surface = Color.White,
+    onSurface = GrassGreen,
+    surfaceVariant = Color.White,
+    onSurfaceVariant = GrassGreen,
+    outline = GrassGreen.copy(alpha = 0.2f),
 )
 
 private val DarkColors = darkColorScheme(
@@ -55,7 +57,7 @@ private val DarkColors = darkColorScheme(
     onPrimary = Color(0xFF003912),
     primaryContainer = Color(0xFF1F5A2D),
     onPrimaryContainer = Color(0xFFB7F0BF),
-    secondary = SandGold,
+    secondary = GoldStar,
     onSecondary = Color(0xFF3A2E00),
     tertiary = Color(0xFFB3B0F0),
     background = Color(0xFF101412),

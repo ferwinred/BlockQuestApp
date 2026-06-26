@@ -17,7 +17,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.material3.MaterialTheme
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.blockquest.data.ads.ActivityHolder
 import com.blockquest.navigation.BlockQuestNavGraph
 import com.blockquest.presentation.ui.theme.BlockQuestTheme

@@ -48,58 +48,58 @@ import com.blockquest.domain.model.WorldDefinition
 import com.blockquest.domain.model.WorldState
 import com.blockquest.presentation.viewmodel.WorldMapViewModel
 
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.ui.graphics.Color
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorldMapScreen(
-    onLevelSelected: (String) -> Unit,
-    onWorldTapped: (Int) -> Unit = {},   // NEW: navigates to LevelSelectScreen
+    onWorldTapped: (Int) -> Unit = {},
     onBack: () -> Unit,
+    onMissionsClick: () -> Unit = {},
     viewModel: WorldMapViewModel = hiltViewModel(),
 ) {
     val state by viewModel.ui.collectAsStateWithLifecycle()
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Mundo") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver",
-                        )
-                    }
-                },
+        bottomBar = {
+            BottomNavBar(
+                currentScreen = "Mapa",
+                onMapClick = {},
+                onMissionsClick = onMissionsClick,
+                onHomeClick = onBack
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(16.dp)
         ) {
+            Text(
+                text = "MUNDOS",
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Black,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
             if (state.isLoading) {
                 Text("Cargando…")
             } else {
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     items(state.worldStates, key = { it.definition.worldIndex }) { ws ->
                         WorldCard(
                             worldState = ws,
-                            levels = state.levels
-                                .filter { it.worldIndex == ws.definition.worldIndex }
-                                .sortedBy { it.levelNumber },
-                            completedLevelIds = state.progression?.results
-                                ?.filterValues { it.completed }
-                                ?.keys
-                                ?: emptySet(),
-                            onLevelTap = { level ->
-                                if (ws.isUnlocked) {
-                                    viewModel.selectLevel(level, onLevelSelected)
-                                }
-                            },
-                            // Tapping the world header opens LevelSelectScreen.
                             onWorldHeaderTap = {
                                 if (ws.isUnlocked) onWorldTapped(ws.definition.worldIndex)
                             },
@@ -121,119 +121,110 @@ fun WorldMapScreen(
 @Composable
 private fun WorldCard(
     worldState: WorldState,
-    levels: List<LevelSpec>,
-    completedLevelIds: Set<String>,
-    onLevelTap: (LevelSpec) -> Unit,
     onWorldHeaderTap: () -> Unit = {},
 ) {
-    val alpha = if (worldState.isUnlocked) 1f else 0.5f
+    val alpha = if (worldState.isUnlocked) 1f else 0.6f
     Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        shadowElevation = 4.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .alpha(alpha),
+            .alpha(alpha)
+            .clickable(enabled = worldState.isUnlocked, onClick = onWorldHeaderTap),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(enabled = worldState.isUnlocked, onClick = onWorldHeaderTap),
-            ) {
-                Column {
-                    Text(
-                        text = if (worldState.isUnlocked) worldState.definition.displayName
-                        else "🔒 ${worldState.definition.worldIndex}",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text = worldState.definition.tagline,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                if (worldState.isUnlocked) {
+        Row(
+            modifier = Modifier.padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (worldState.isUnlocked) worldState.definition.displayName.uppercase()
+                    else "BLOQUEADO",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = worldState.definition.tagline,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            
+            if (worldState.isUnlocked) {
+                Column(horizontalAlignment = Alignment.End) {
                     Text(
                         text = "⭐ ${worldState.totalStars}/${worldState.maxStars}",
                         style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFFD93D)
+                    )
+                    Text(
+                        text = "${(worldState.completionFraction * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelSmall
                     )
                 }
-            }
-            if (worldState.isUnlocked) {
-                Spacer()
-                LinearProgressIndicator(
-                    progress = { worldState.completionFraction },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer()
-                // Grid of level buttons (3 per row).
-                levels.chunked(3).forEach { row ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                    ) {
-                        row.forEach { level ->
-                            LevelButton(
-                                level = level,
-                                completed = level.levelId in completedLevelIds,
-                                stars = 0,  // we don't have per-level stars in this view
-                                onClick = { onLevelTap(level) },
-                                modifier = Modifier.weight(1f).padding(4.dp),
-                            )
-                        }
-                        repeat(3 - row.size) {
-                            Box(modifier = Modifier.weight(1f).padding(4.dp))
-                        }
-                    }
-                }
+            } else {
+                Icon(Icons.Default.Lock, contentDescription = null, tint = Color.Gray)
             }
         }
     }
 }
 
 @Composable
-private fun LevelButton(
-    level: LevelSpec,
-    completed: Boolean,
-    stars: Int,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
+private fun BottomNavBar(
+    currentScreen: String,
+    onMapClick: () -> Unit,
+    onMissionsClick: () -> Unit,
+    onHomeClick: () -> Unit
 ) {
-    val background = when {
-        completed -> MaterialTheme.colorScheme.primary
-        level.isBoss -> MaterialTheme.colorScheme.tertiary
-        level.isMilestone -> MaterialTheme.colorScheme.secondary
-        else -> MaterialTheme.colorScheme.primaryContainer
-    }
-    val foreground = when {
-        completed -> MaterialTheme.colorScheme.onPrimary
-        level.isBoss -> MaterialTheme.colorScheme.onTertiary
-        level.isMilestone -> MaterialTheme.colorScheme.onSecondary
-        else -> MaterialTheme.colorScheme.onPrimaryContainer
-    }
-    Box(
-        modifier = modifier
-            .aspectRatio(1f)
-            .clip(CircleShape)
-            .background(background)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
+    NavigationBar(
+        containerColor = Color.White,
+        tonalElevation = 8.dp
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = level.levelNumber.toString(),
-                style = MaterialTheme.typography.titleMedium,
-                color = foreground,
-                fontWeight = FontWeight.Bold,
+        NavigationBarItem(
+            selected = currentScreen == "Mapa",
+            onClick = onMapClick,
+            icon = { Icon(Icons.Default.Map, contentDescription = null) },
+            label = { Text("Mapa") },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = MaterialTheme.colorScheme.primary,
+                selectedTextColor = MaterialTheme.colorScheme.primary,
+                unselectedIconColor = Color.Gray,
+                unselectedTextColor = Color.Gray,
+                indicatorColor = Color.Transparent
             )
-            if (level.isBoss) {
-                Text("BOSS", style = MaterialTheme.typography.labelSmall, color = foreground)
-            }
-        }
+        )
+        NavigationBarItem(
+            selected = currentScreen == "Misiones",
+            onClick = onMissionsClick,
+            icon = { Icon(Icons.Default.Star, contentDescription = null) },
+            label = { Text("Misiones") },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = MaterialTheme.colorScheme.primary,
+                selectedTextColor = MaterialTheme.colorScheme.primary,
+                unselectedIconColor = Color.Gray,
+                unselectedTextColor = Color.Gray,
+                indicatorColor = Color.Transparent
+            )
+        )
+        NavigationBarItem(
+            selected = currentScreen == "Inicio",
+            onClick = onHomeClick,
+            icon = { Icon(Icons.Default.PowerSettingsNew, contentDescription = null) },
+            label = { Text("Inicio") },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = MaterialTheme.colorScheme.primary,
+                selectedTextColor = MaterialTheme.colorScheme.primary,
+                unselectedIconColor = Color.Gray,
+                unselectedTextColor = Color.Gray,
+                indicatorColor = Color.Transparent
+            )
+        )
     }
 }
+
 
 @Composable
 private fun WorldUnlockDialog(

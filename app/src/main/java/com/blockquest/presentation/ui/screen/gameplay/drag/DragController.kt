@@ -56,7 +56,7 @@ class DragController {
         boardOriginX: Float,
         boardOriginY: Float,
     ) {
-        _state.value = _state.value.copy(
+        _state.value = DragState(
             isDragging = true,
             trayIndex = trayIndex,
             piece = piece,
@@ -73,11 +73,6 @@ class DragController {
         )
     }
 
-    /**
-     * Update the drag offset. Recomputes the ghost cell
-     * position. Validity is now handled in the UI/ViewModel 
-     * to avoid passing lambdas that capture state.
-     */
     fun updateDrag(
         touchX: Float,
         touchY: Float,
@@ -105,6 +100,15 @@ class DragController {
         )
     }
 
+    fun updateDragRelative(
+        deltaX: Float,
+        deltaY: Float,
+    ) {
+        val s = _state.value
+        if (!s.isDragging) return
+        updateDrag(s.offsetX + deltaX, s.offsetY + deltaY)
+    }
+
     fun setValid(isValid: Boolean) {
         if (_state.value.isValid != isValid) {
             _state.value = _state.value.copy(isValid = isValid)
@@ -118,19 +122,35 @@ class DragController {
     fun endDrag(): DropResult? {
         val s = _state.value
         if (!s.isDragging) return null
-        val piece = s.piece ?: run { _state.value = DragState(); return null }
         val result = if (s.isValid) {
             DropResult(
                 trayIndex = s.trayIndex,
                 cell = Cell(s.ghostCol, s.ghostRow),
             )
         } else null
-        _state.value = DragState()
+        
+        // Reset drag state but PRESERVE layout info
+        _state.value = s.copy(
+            isDragging = false,
+            trayIndex = -1,
+            piece = null,
+            ghostCol = -1,
+            ghostRow = -1,
+            isValid = false
+        )
         return result
     }
 
     fun cancel() {
-        _state.value = DragState()
+        val s = _state.value
+        _state.value = s.copy(
+            isDragging = false,
+            trayIndex = -1,
+            piece = null,
+            ghostCol = -1,
+            ghostRow = -1,
+            isValid = false
+        )
     }
 }
 
