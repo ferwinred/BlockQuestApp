@@ -136,23 +136,60 @@ class GameplayViewModel @Inject constructor(
     val isAdInProgress: StateFlow<Boolean> = _isAdInProgress
 
     init {
-        // Preload the first rewarded ad so the player can
-        // continue after game-over with zero latency.
         viewModelScope.launch {
-            preloadRewardedAd(AdPlacement.ContinueAfterGameOver)
-        }
-    }
+            // 1. Preload the first rewarded ad so the player can
+            // continue after game-over with zero latency.
+            launch {
+                preloadRewardedAd(AdPlacement.ContinueAfterGameOver)
+            }
 
-    /**
-     * Memos: the engine's "last frame" stats. We snapshot
-     * them at every accepted placement so the UI can show
-     * "you cleared 2 lines" feedback.
-     */
-    private val _lastStats = MutableStateFlow<PlacementResult.Accepted?>(null)
-    val lastStats: StateFlow<PlacementResult.Accepted?> = _lastStats
+            // 2. Audio / haptic event collector
+            // Runs for the lifetime of the ViewModel. Each engine event is
+            // mapped to a sound effect and/or a haptic pattern. The collector
+            // never blocks: SoundManager.play() and HapticManager.vibrate()
+            // are both synchronous and lightweight.
+            launch {
+                engine.events.collect { event ->
+                    when (event) {
+                        is GameEvent.PiecePlaced -> {
+                            sound.play(com.blockquest.audio.Sfx.PIECE_PLACE)
+                            haptic.vibrate(com.blockquest.audio.HapticPattern.PIECE_PLACE)
+                        }
+                        is GameEvent.LinesCleared -> {
+                            val total = event.rows.size + event.columns.size + event.squares3x3.size
+                            if (total > 0) {
+                                sound.play(com.blockquest.audio.Sfx.LINE_CLEAR)
+                                haptic.vibrate(com.blockquest.audio.HapticPattern.LINE_CLEAR)
+                            }
+                        }
+                        is GameEvent.ComboActivated -> {
+                            sound.play(com.blockquest.audio.Sfx.COMBO)
+                            haptic.vibrate(com.blockquest.audio.HapticPattern.COMBO)
+                        }
+                        is GameEvent.StreakUpdated -> {
+                            // Only play at "high" streak levels (≥ 3) to avoid audio spam.
+                            if (event.level >= 3) {
+                                sound.play(com.blockquest.audio.Sfx.STREAK_HIGH)
+                            }
+                        }
+                        is GameEvent.LevelFailed -> {
+                            sound.play(com.blockquest.audio.Sfx.GAME_OVER)
+                            haptic.vibrate(com.blockquest.audio.HapticPattern.GAME_OVER)
+                        }
+                        is GameEvent.LevelCompleted -> {
+                            sound.play(com.blockquest.audio.Sfx.LEVEL_COMPLETE)
+                            haptic.vibrate(com.blockquest.audio.HapticPattern.LEVEL_COMPLETE)
+                        }
+                        is GameEvent.HeatUnlocked -> {
+                            sound.play(com.blockquest.audio.Sfx.HEAT_UNLOCK)
+                            haptic.vibrate(com.blockquest.audio.HapticPattern.HEAT_UNLOCK)
+                        }
+                        else -> Unit
+                    }
+                }
+            }
 
-    init {
-        viewModelScope.launch {
+            // 3. Start Level
             runCatching {
                 val level = getLevel(levelId) ?: error("Level $levelId not found")
                 engine.startLevel(level, attempt = 1)
@@ -168,53 +205,17 @@ class GameplayViewModel @Inject constructor(
         }
     }
 
-    // ── Audio / haptic event collector ───────────────────────────────
-    // Runs for the lifetime of the ViewModel. Each engine event is
-    // mapped to a sound effect and/or a haptic pattern. The collector
-    // never blocks: SoundManager.play() and HapticManager.vibrate()
-    // are both synchronous and lightweight.
-    init {
-        viewModelScope.launch {
-            engine.events.collect { event ->
-                when (event) {
-                    is GameEvent.PiecePlaced -> {
-                        sound.play(com.blockquest.audio.Sfx.PIECE_PLACE)
-                        haptic.vibrate(com.blockquest.audio.HapticPattern.PIECE_PLACE)
-                    }
-                    is GameEvent.LinesCleared -> {
-                        val total = event.rows.size + event.columns.size + event.squares3x3.size
-                        if (total > 0) {
-                            sound.play(com.blockquest.audio.Sfx.LINE_CLEAR)
-                            haptic.vibrate(com.blockquest.audio.HapticPattern.LINE_CLEAR)
-                        }
-                    }
-                    is GameEvent.ComboActivated -> {
-                        sound.play(com.blockquest.audio.Sfx.COMBO)
-                        haptic.vibrate(com.blockquest.audio.HapticPattern.COMBO)
-                    }
-                    is GameEvent.StreakUpdated -> {
-                        // Only play at "high" streak levels (≥ 3) to avoid audio spam.
-                        if (event.level >= 3) {
-                            sound.play(com.blockquest.audio.Sfx.STREAK_HIGH)
-                        }
-                    }
-                    is GameEvent.LevelFailed -> {
-                        sound.play(com.blockquest.audio.Sfx.GAME_OVER)
-                        haptic.vibrate(com.blockquest.audio.HapticPattern.GAME_OVER)
-                    }
-                    is GameEvent.LevelCompleted -> {
-                        sound.play(com.blockquest.audio.Sfx.LEVEL_COMPLETE)
-                        haptic.vibrate(com.blockquest.audio.HapticPattern.LEVEL_COMPLETE)
-                    }
-                    is GameEvent.HeatUnlocked -> {
-                        sound.play(com.blockquest.audio.Sfx.HEAT_UNLOCK)
-                        haptic.vibrate(com.blockquest.audio.HapticPattern.HEAT_UNLOCK)
-                    }
-                    else -> Unit
-                }
-            }
-        }
-    }
+    /**
+     * Memos: the engine's "last frame" stats. We snapshot
+     * them at every accepted placement so the UI can show
+     * "you cleared 2 lines" feedback.
+     */
+    private val _lastStats = MutableStateFlow<PlacementResult.Accepted?>(null)
+    val lastStats: StateFlow<PlacementResult.Accepted?> = _lastStats
+
+
+
+
 
     /**
      * Place a piece from the tray at (col, row). Used by

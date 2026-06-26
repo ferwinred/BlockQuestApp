@@ -137,7 +137,7 @@ class EnsureSignedInUseCase @Inject constructor (
 ) {
     suspend operator fun invoke(): String {
         val userId = players.ensureSignedIn()
-        analytics.setUserProperty("user_id", userId)
+        analytics.setUserProperty("player_uid", userId)
         return userId
     }
 }

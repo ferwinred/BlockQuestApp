@@ -30,6 +30,7 @@ data class MainMenuUiState(
     val dailyRewardConfig: DailyRewardConfig? = null,
     val dailyRewardAvailable: Boolean = false,
     val isLoading: Boolean = true,
+    val errorMessage: String? = null,
 )
 
 @HiltViewModel
@@ -41,12 +42,14 @@ class MainMenuViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _dailyReward = MutableStateFlow(DailyRewardState())
+    private val _errorMessage = MutableStateFlow<String?>(null)
 
     val ui: StateFlow<MainMenuUiState> = combine(
         observeCurrency(),
         _dailyReward,
         dailyRewardConfigRepo.observeConfig(),
-    ) { currency, daily, config ->
+        _errorMessage,
+    ) { currency, daily, config, errorMsg ->
         val now      = System.currentTimeMillis()
         val oneDayMs = config.cooldownMs
         val available = daily.lastClaimed == 0L ||
@@ -57,6 +60,7 @@ class MainMenuViewModel @Inject constructor(
             dailyRewardConfig    = config,
             dailyRewardAvailable = available,
             isLoading            = false,
+            errorMessage         = errorMsg,
         )
     }.stateIn(
         scope          = viewModelScope,
@@ -65,7 +69,13 @@ class MainMenuViewModel @Inject constructor(
     )
 
     init {
-        viewModelScope.launch { ensureSignedIn() }
+        viewModelScope.launch {
+            runCatching {
+                ensureSignedIn()
+            }.onFailure { e ->
+                _errorMessage.value = e.message ?: "Authentication failed"
+            }
+        }
     }
 
     /**

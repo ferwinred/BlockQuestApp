@@ -28,14 +28,19 @@ class FirebaseProgressionRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
 ) : ProgressionRepository {
 
-    private fun doc() = firestore.collection("players")
-        .document(auth.currentUser?.uid ?: "anonymous")
+    private fun getDocRef(uid: String) = firestore.collection("players")
+        .document(uid)
         .collection("progression")
         .document("main")
 
     override fun observeProgression(): Flow<ProgressionState> = callbackFlow {
-        val userId = auth.currentUser?.uid ?: "anonymous"
-        val registration = doc().addSnapshotListener { snap, error ->
+        val userId = auth.currentUser?.uid
+        if (userId == null) {
+            trySend(ProgressionState())
+            close()
+            return@callbackFlow
+        }
+        val registration = getDocRef(userId).addSnapshotListener { snap, error ->
             if (error != null) {
                 close(error)
                 return@addSnapshotListener
@@ -47,7 +52,8 @@ class FirebaseProgressionRepository @Inject constructor(
     }
 
     override suspend fun recordLevelResult(result: LevelResult) {
-        val current = doc().get().await()
+        val uid = auth.currentUser?.uid ?: return
+        val current = getDocRef(uid).get().await()
             .toObject(ProgressionDto::class.java) ?: ProgressionDto()
         val existing = current.results[result.levelId]
         val merged = current.copy(
@@ -69,27 +75,30 @@ class FirebaseProgressionRepository @Inject constructor(
                 }
             ))
         )
-        doc().set(merged, SetOptions.merge()).await()
+        getDocRef(uid).set(merged, SetOptions.merge()).await()
     }
 
     override suspend fun unlockWorld(worldIndex: Int, method: String) {
         if (worldIndex !in 0..4) return
-        val current = doc().get().await()
+        val uid = auth.currentUser?.uid ?: return
+        val current = getDocRef(uid).get().await()
             .toObject(ProgressionDto::class.java) ?: ProgressionDto()
         val list = current.worldUnlocked.toMutableList()
         if (worldIndex in list.indices) list[worldIndex] = true
-        doc().set(current.copy(worldUnlocked = list), SetOptions.merge()).await()
+        getDocRef(uid).set(current.copy(worldUnlocked = list), SetOptions.merge()).await()
     }
 
     override suspend fun unlockAchievement(achievementId: String) {
-        val current = doc().get().await()
+        val uid = auth.currentUser?.uid ?: return
+        val current = getDocRef(uid).get().await()
             .toObject(ProgressionDto::class.java) ?: ProgressionDto()
         if (achievementId in current.completedAchievements) return
         val list = current.completedAchievements + achievementId
-        doc().set(current.copy(completedAchievements = list), SetOptions.merge()).await()
+        getDocRef(uid).set(current.copy(completedAchievements = list), SetOptions.merge()).await()
     }
 
     override suspend fun reset() {
-        doc().set(ProgressionDto(), SetOptions.merge()).await()
+        val uid = auth.currentUser?.uid ?: return
+        getDocRef(uid).set(ProgressionDto(), SetOptions.merge()).await()
     }
 }
