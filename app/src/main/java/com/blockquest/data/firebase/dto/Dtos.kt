@@ -127,8 +127,12 @@ data class LevelDto(
     val rewardGems: Int = 0,
     val rewardSkinId: String? = null,
     val rewardTitleId: String? = null,
-    val isMilestone: Boolean = false,
-    val isBoss: Boolean = false,
+    @get:PropertyName("isMilestone")
+    @set:PropertyName("isMilestone")
+    var isMilestone: Boolean = false,
+    @get:PropertyName("isBoss")
+    @set:PropertyName("isBoss")
+    var isBoss: Boolean = false,
     val silverMultiplier: Double = 1.25,
     val goldMultiplier: Double = 1.50,
     val bossConfig: BossConfigDto? = null,

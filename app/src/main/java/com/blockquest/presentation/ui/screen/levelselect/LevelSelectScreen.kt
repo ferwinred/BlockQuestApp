@@ -1,17 +1,6 @@
 // =====================================================================
 // LevelSelectScreen.kt
-// Block Quest — Level selection grid for a single world (Semana 3)
-//
-// Flow:
-//   WorldMapScreen → LevelSelectScreen(worldIndex) → GameplayScreen(levelId)
-//
-// Features:
-//  • LazyVerticalGrid of level bubbles (3 columns).
-//  • Each bubble shows: number, lock icon, star rating (0–3).
-//  • Tap a locked level → shows a "locked" snackbar.
-//  • Tap an unlocked level → opens a bottom-sheet preview with best
-//    score, stars, and a "Jugar" button.
-//  • World progress bar at the top (completed / total).
+// Block Quest — Level selection map for a single world
 // =====================================================================
 
 package com.blockquest.presentation.ui.screen.levelselect
@@ -22,6 +11,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,35 +19,37 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -66,19 +58,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.blockquest.domain.model.LevelResult
 import com.blockquest.domain.model.LevelSpec
 import com.blockquest.presentation.viewmodel.LevelSelectViewModel
 import kotlinx.coroutines.launch
-
-// ── Screen ────────────────────────────────────────────────────────────────
+import kotlin.math.sin
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,35 +78,25 @@ fun LevelSelectScreen(
     worldIndex: Int,
     onLevelSelected: (String) -> Unit,
     onBack: () -> Unit,
+    onMissionsClick: () -> Unit = {},
     viewModel: LevelSelectViewModel = hiltViewModel(),
 ) {
     val state by viewModel.ui(worldIndex).collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-
-    // Level whose preview bottom-sheet is currently open (null = closed).
     var previewLevel by remember { mutableStateOf<LevelSpec?>(null) }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = state.worldName.ifBlank { "Mundo ${worldIndex + 1}" },
-                        style = MaterialTheme.typography.titleLarge,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver",
-                        )
-                    }
-                },
+        bottomBar = {
+            BottomNavBar(
+                currentScreen = "Mapa",
+                onMapClick = {},
+                onMissionsClick = onMissionsClick,
+                onHomeClick = onBack
             )
         },
+        containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         Box(
             modifier = Modifier
@@ -127,48 +109,46 @@ fun LevelSelectScreen(
                     modifier = Modifier.align(Alignment.Center),
                 )
             } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                ) {
-                    // ── World progress bar ────────────────────────────
-                    WorldProgressHeader(
-                        worldName    = state.worldName,
-                        completed    = state.completedCount,
-                        total        = state.totalCount,
-                        stars        = state.totalStars,
-                        maxStars     = state.maxStars,
-                    )
-
-                    Spacer(Modifier.height(16.dp))
-
-                    // ── Level grid ───────────────────────────────────
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(4),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement   = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxSize(),
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Header
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        items(state.levels, key = { it.spec.levelId }) { item ->
-                            LevelBubble(
-                                item    = item,
-                                onClick = {
-                                    if (!item.isUnlocked) {
-                                        scope.launch {
-                                            snackbar.showSnackbar("🔒 Completa los niveles anteriores")
-                                        }
-                                    } else {
-                                        previewLevel = item.spec
-                                    }
-                                },
-                            )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            CurrencyBox(icon = "🪙", value = "1.250")
                         }
+                        
+                        Text(
+                            text = state.worldName.uppercase(),
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Black,
+                            textAlign = TextAlign.Center
+                        )
                     }
+
+                    // Map Path
+                    WorldMapPath(
+                        levels = state.levels,
+                        onLevelClick = { item ->
+                            if (!item.isUnlocked) {
+                                scope.launch {
+                                    snackbar.showSnackbar("🔒 Completa los niveles anteriores")
+                                }
+                            } else {
+                                previewLevel = item.spec
+                            }
+                        }
+                    )
                 }
             }
 
-            // ── Level preview sheet ───────────────────────────────────
             LevelPreviewSheet(
                 level     = previewLevel,
                 result    = previewLevel?.let { l ->
@@ -184,125 +164,161 @@ fun LevelSelectScreen(
     }
 }
 
-// ── Sub-composables ───────────────────────────────────────────────────────
-
 @Composable
-private fun WorldProgressHeader(
-    worldName: String,
-    completed: Int,
-    total: Int,
-    stars: Int,
-    maxStars: Int,
+private fun WorldMapPath(
+    levels: List<LevelSelectItem>,
+    onLevelClick: (LevelSelectItem) -> Unit
 ) {
-    val fraction = if (total > 0) completed.toFloat() / total else 0f
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "$completed / $total niveles",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = "⭐ $stars / $maxStars",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        LinearProgressIndicator(
-            progress = { fraction },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp)),
-        )
-    }
-}
-
-@Composable
-private fun LevelBubble(
-    item: LevelSelectItem,
-    onClick: () -> Unit,
-) {
-    val isLocked = !item.isUnlocked
-    val bgColor = when {
-        isLocked           -> MaterialTheme.colorScheme.surfaceVariant
-        item.spec.isBoss   -> MaterialTheme.colorScheme.tertiary
-        item.result?.completed == true -> MaterialTheme.colorScheme.primary
-        else               -> MaterialTheme.colorScheme.primaryContainer
-    }
-    val fgColor = when {
-        isLocked           -> MaterialTheme.colorScheme.onSurfaceVariant
-        item.spec.isBoss   -> MaterialTheme.colorScheme.onTertiary
-        item.result?.completed == true -> MaterialTheme.colorScheme.onPrimary
-        else               -> MaterialTheme.colorScheme.onPrimaryContainer
-    }
-
+    val scrollState = rememberScrollState()
+    
     Box(
         modifier = Modifier
-            .aspectRatio(1f)
-            .clip(CircleShape)
-            .background(bgColor)
-            .alpha(if (isLocked) 0.55f else 1f)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(vertical = 40.dp)
     ) {
-        if (isLocked) {
-            Icon(
-                imageVector = Icons.Filled.Lock,
-                contentDescription = "Bloqueado",
-                tint = fgColor,
-                modifier = Modifier.size(20.dp),
-            )
-        } else {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text(
-                    text = item.spec.levelNumber.toString(),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = fgColor,
-                )
-                if (item.spec.isBoss) {
-                    Text(
-                        text = "BOSS",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = fgColor,
-                    )
-                } else {
-                    StarRow(stars = item.result?.stars ?: 0, max = 3, size = 10.dp)
+        // Decorative River
+        Canvas(modifier = Modifier.fillMaxWidth().height(1500.dp)) {
+            val riverPath = Path().apply {
+                moveTo(size.width * 0.8f, 0f)
+                var currentY = 0f
+                while (currentY < size.height) {
+                    currentY += 50f
+                    val x = size.width * 0.8f + sin(currentY / 150f) * 60f
+                    lineTo(x, currentY)
                 }
+                lineTo(size.width, size.height)
+                lineTo(size.width, 0f)
+                close()
+            }
+            drawPath(riverPath, Color(0xFFB3E5FC))
+        }
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(60.dp)
+        ) {
+            levels.forEachIndexed { index, item ->
+                val xOffset = sin(index.toFloat() * 1.2f) * 80f
+                
+                LevelNode(
+                    item = item,
+                    onClick = { onLevelClick(item) },
+                    modifier = Modifier.offset(x = xOffset.dp)
+                )
             }
         }
     }
 }
 
 @Composable
-private fun StarRow(
-    stars: Int,
-    max: Int,
-    size: androidx.compose.ui.unit.Dp,
+private fun LevelNode(
+    item: LevelSelectItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Row {
-        repeat(max) { i ->
-            Icon(
-                imageVector = if (i < stars) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                contentDescription = null,
-                tint = if (i < stars) MaterialTheme.colorScheme.inversePrimary
-                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                modifier = Modifier.size(size),
-            )
+    val isLocked = !item.isUnlocked
+    
+    Column(
+        modifier = modifier.clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Stump Icon
+        Surface(
+            modifier = Modifier.size(64.dp),
+            shape = RoundedCornerShape(8.dp),
+            color = Color(0xFF795548), // Brown stump
+            shadowElevation = 4.dp
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                if (isLocked) {
+                    Icon(Icons.Default.Lock, contentDescription = null, tint = Color.White.copy(alpha = 0.5f))
+                } else if (item.result?.completed == true) {
+                    Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD93D))
+                }
+            }
         }
+        
+        Text(
+            text = "Nivel ${item.spec.levelNumber}",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
     }
 }
 
-// ── Level preview bottom sheet (lightweight AnimatedVisibility overlay) ───
+@Composable
+private fun BottomNavBar(
+    currentScreen: String,
+    onMapClick: () -> Unit,
+    onMissionsClick: () -> Unit,
+    onHomeClick: () -> Unit
+) {
+    NavigationBar(
+        containerColor = Color.White,
+        tonalElevation = 8.dp
+    ) {
+        NavigationBarItem(
+            selected = currentScreen == "Mapa",
+            onClick = onMapClick,
+            icon = { Icon(Icons.Default.Map, contentDescription = null) },
+            label = { Text("Mapa") },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = MaterialTheme.colorScheme.primary,
+                selectedTextColor = MaterialTheme.colorScheme.primary,
+                unselectedIconColor = Color.Gray,
+                unselectedTextColor = Color.Gray,
+                indicatorColor = Color.Transparent
+            )
+        )
+        NavigationBarItem(
+            selected = currentScreen == "Misiones",
+            onClick = onMissionsClick,
+            icon = { Icon(Icons.Default.Star, contentDescription = null) },
+            label = { Text("Misiones") },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = MaterialTheme.colorScheme.primary,
+                selectedTextColor = MaterialTheme.colorScheme.primary,
+                unselectedIconColor = Color.Gray,
+                unselectedTextColor = Color.Gray,
+                indicatorColor = Color.Transparent
+            )
+        )
+        NavigationBarItem(
+            selected = currentScreen == "Inicio",
+            onClick = onHomeClick,
+            icon = { Icon(Icons.Default.PowerSettingsNew, contentDescription = null) },
+            label = { Text("Inicio") },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = MaterialTheme.colorScheme.primary,
+                selectedTextColor = MaterialTheme.colorScheme.primary,
+                unselectedIconColor = Color.Gray,
+                unselectedTextColor = Color.Gray,
+                indicatorColor = Color.Transparent
+            )
+        )
+    }
+}
+
+@Composable
+private fun CurrencyBox(icon: String, value: String) {
+    Surface(
+        color = Color.White,
+        shape = RoundedCornerShape(4.dp),
+        shadowElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(icon, fontSize = 16.sp)
+            Spacer(Modifier.width(4.dp))
+            Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+        }
+    }
+}
 
 @Composable
 private fun LevelPreviewSheet(
@@ -313,123 +329,62 @@ private fun LevelPreviewSheet(
 ) {
     AnimatedVisibility(
         visible = level != null,
-        enter = slideInVertically(
-            initialOffsetY = { it },
-            animationSpec  = tween(280),
-        ) + fadeIn(tween(200)),
-        exit = slideOutVertically(
-            targetOffsetY = { it },
-            animationSpec = tween(220),
-        ) + fadeOut(tween(150)),
+        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
     ) {
-        // Scrim
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.4f))
-                .clickable(onClick = onDismiss),
+                .background(Color.Black.copy(alpha = 0.4f))
+                .clickable(onClick = onDismiss)
         )
     }
 
     AnimatedVisibility(
         visible = level != null,
-        enter = slideInVertically(
-            initialOffsetY = { it },
-            animationSpec  = tween(300),
-        ),
-        exit = slideOutVertically(
-            targetOffsetY = { it },
-            animationSpec = tween(220),
-        ),
-        modifier = Modifier.fillMaxSize(),
+        enter = slideInVertically(initialOffsetY = { it }),
+        exit = slideOutVertically(targetOffsetY = { it }),
+        modifier = Modifier.fillMaxSize()
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.BottomCenter,
-        ) {
+        Box(contentAlignment = Alignment.BottomCenter) {
             level?.let { lvl ->
                 Surface(
-                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 8.dp,
-                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    color = Color.White,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
                         modifier = Modifier.padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Handle bar
-                        Box(
-                            modifier = Modifier
-                                .size(width = 40.dp, height = 4.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
-                        )
-
-                        // Title
                         Text(
-                            text = if (lvl.isBoss) "⚔️ BOSS — Nivel ${lvl.levelNumber}"
-                                   else "Nivel ${lvl.levelNumber}",
+                            text = "Nivel ${lvl.levelNumber}",
                             style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
+                            fontWeight = FontWeight.Bold
                         )
-
-                        // Stars
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             repeat(3) { i ->
                                 Icon(
-                                    imageVector = if (i < (result?.stars ?: 0)) Icons.Filled.Star
-                                                  else Icons.Outlined.StarBorder,
+                                    imageVector = if (i < (result?.stars ?: 0)) Icons.Filled.Star else Icons.Outlined.StarBorder,
                                     contentDescription = null,
-                                    tint = if (i < (result?.stars ?: 0))
-                                               MaterialTheme.colorScheme.primary
-                                           else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                                    modifier = Modifier.size(32.dp),
+                                    tint = if (i < (result?.stars ?: 0)) Color(0xFFFFD93D) else Color.Gray,
+                                    modifier = Modifier.size(32.dp)
                                 )
                             }
                         }
 
-                        // Best score
-                        if (result?.bestScore != null && result.bestScore > 0) {
-                            Text(
-                                text = "Mejor puntaje: ${result.bestScore}",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-
-                        // Objective
-                        Text(
-                            text = "Objetivo: ${lvl.objective.name.lowercase()
-                                .replaceFirstChar { it.uppercase() }
-                                .replace('_', ' ')}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-
-                        Spacer(Modifier.height(4.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        Button(
+                            onClick = { onPlay(lvl.levelId) },
+                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                            shape = RoundedCornerShape(28.dp)
                         ) {
-                            TextButton(
-                                onClick = onDismiss,
-                                modifier = Modifier.weight(1f),
-                            ) {
-                                Text("Cancelar")
-                            }
-                            Button(
-                                onClick  = { onPlay(lvl.levelId) },
-                                modifier = Modifier.weight(2f),
-                            ) {
-                                Text(
-                                    text = if (result?.completed == true) "🔄 Rejugar" else "▶ Jugar",
-                                    style = MaterialTheme.typography.titleMedium,
-                                )
-                            }
+                            Text("¡JUGAR!")
+                        }
+                        
+                        TextButton(onClick = onDismiss) {
+                            Text("Cerrar")
                         }
                     }
                 }

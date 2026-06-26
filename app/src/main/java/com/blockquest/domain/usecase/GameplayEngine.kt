@@ -218,7 +218,7 @@ class GameplayEngine @Inject constructor (
         undoStack.clear()
         val seed = PiecePoolSelector.deriveSeed(level.levelId, level.worldIndex)
         pieceSelector = PiecePoolSelector(
-            pool = PiecePoolSelector.praderaPool(),
+            pool = level.piecePool.map { it to 10 }, // Default weight 10
             random = seedRandom.let { Random(seed) },
         )
         val initialTray = pieceSelector!!.buildTray(TRAY_SIZE, level)
@@ -317,6 +317,14 @@ class GameplayEngine @Inject constructor (
         val newSpecials = s.specialCellsCleared +
                 special.crystalsDemoted + special.blackHolesConsumed
 
+        // 6. Consume the piece and (maybe) refresh the tray.
+        val newTray = tray.toMutableList().also { it.removeAt(trayIndex) }
+        val finalTray = if (newTray.isEmpty()) {
+            val refreshed = pieceSelector?.buildTray(TRAY_SIZE, level) ?: emptyList()
+            _events.tryEmit(GameEvent.TrayRefreshed(refreshed))
+            refreshed
+        } else newTray
+
         _state.value = s.copy(
             score = newScore,
             streak = newStreak,
@@ -326,6 +334,8 @@ class GameplayEngine @Inject constructor (
             specialCellsCleared = newSpecials,
             totalLinesCleared = s.totalLinesCleared + clear.rows.size + clear.columns.size,
             totalSquaresCleared = s.totalSquaresCleared + clear.squares3x3.size,
+            tray = finalTray,
+            piecesPlacedThisLevel = s.piecesPlacedThisLevel + 1,
         )
 
         _events.tryEmit(GameEvent.ScoreUpdated(newScore, level.targetScore, totalPoints))
@@ -336,18 +346,6 @@ class GameplayEngine @Inject constructor (
         if (clear.rows.isNotEmpty() || clear.columns.isNotEmpty() || clear.squares3x3.isNotEmpty()) {
             _events.tryEmit(GameEvent.LinesCleared(clear.rows, clear.columns, clear.squares3x3))
         }
-
-        // 6. Consume the piece and (maybe) refresh the tray.
-        val newTray = tray.toMutableList().also { it.removeAt(trayIndex) }
-        val finalTray = if (newTray.isEmpty()) {
-            val refreshed = pieceSelector?.buildTray(TRAY_SIZE, level) ?: emptyList()
-            _events.tryEmit(GameEvent.TrayRefreshed(refreshed))
-            refreshed
-        } else newTray
-        _state.value = _state.value.copy(
-            tray = finalTray,
-            piecesPlacedThisLevel = s.piecesPlacedThisLevel + 1,
-        )
 
         // 7. Victory / boss / game over.
         if (level.targetScore in 1..newScore) {
@@ -363,7 +361,7 @@ class GameplayEngine @Inject constructor (
                 movesRemainingOnShield = s.movesRemainingOnShield - 1
             )
         }
-        if (s.movesRemainingOnShield == 0 && !canAnyPieceBePlaced(s.board, finalTray)) {
+        if (_state.value.movesRemainingOnShield == 0 && !canAnyPieceBePlaced(s.board, finalTray)) {
             return emitFailed("no_space", newScore)
         }
 

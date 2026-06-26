@@ -13,7 +13,7 @@ import android.content.Context
 @Database(
     entities = [LevelCacheEntity::class, MissionProgressEntity::class],
     version = 2,
-    exportSchema = true,
+    exportSchema = false,
 )
 abstract class BlockQuestDatabase : RoomDatabase() {
     abstract fun levelCacheDao(): LevelCacheDao
@@ -28,7 +28,7 @@ abstract class BlockQuestDatabase : RoomDatabase() {
             )
             // Room 3.0 dropped SupportSQLite, so we don't need
             // to enable fallback DDL migrations.
-            .fallbackToDestructiveMigration()
+            .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
     }
 }

@@ -6,12 +6,36 @@
 package com.blockquest
 
 import android.app.Application
+import android.content.Context
 import android.content.pm.ApplicationInfo
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
+import com.blockquest.data.firebase.FirestoreSeeder
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import javax.inject.Inject
 
 @HiltAndroidApp
 class BlockQuestApp : Application() {
+    @Inject
+    lateinit var firestore: FirebaseFirestore
+
+    /**
+     * Fix for ServiceNotFoundException: No service published for: persistent_data_block
+     * This service is used for Factory Reset Protection and is missing on some
+     * devices/emulators. Some SDKs (like GMA or Firebase) try to access it via
+     * getSystemService, which throws an exception in recent Android versions
+     * because it uses getServiceOrThrow internally.
+     */
+    override fun getSystemService(name: String): Any? {
+        if (name == Context.PERSISTENT_DATA_BLOCK_SERVICE) {
+            return null
+        }
+        return super.getSystemService(name)
+    }
+
     override fun onCreate() {
         super.onCreate()
         // Timber is the only logger; in release builds the
@@ -20,6 +44,8 @@ class BlockQuestApp : Application() {
         if (isDebuggable) {
             Timber.plant(Timber.DebugTree())
             Timber.d("Timber initialized in mode native DEBUG")
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            FirestoreSeeder.seedIfNeeded(firestore, scope)
         } else {
             Timber.plant(ReleaseTree())
         }

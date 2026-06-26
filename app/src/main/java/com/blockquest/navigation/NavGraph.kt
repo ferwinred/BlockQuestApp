@@ -49,18 +49,12 @@ fun BlockQuestNavGraph() {
         }
 
         composable(Routes.WORLD_MAP) {
-            // WorldMap now navigates to LevelSelect instead of directly to Gameplay.
-            // The player taps a world card → sees the level grid → taps a bubble.
             WorldMapScreen(
-                onLevelSelected = { levelId ->
-                    // Legacy path kept for boss / direct deep-links:
-                    // the WorldMap can still bypass LevelSelect if needed.
-                    nav.navigate(Routes.gameplay(levelId))
-                },
                 onWorldTapped = { worldIndex ->
                     nav.navigate(Routes.levelSelect(worldIndex))
                 },
                 onBack = { nav.popBackStack() },
+                onMissionsClick = { nav.navigate(Routes.MISSIONS) }
             )
         }
 
@@ -75,6 +69,7 @@ fun BlockQuestNavGraph() {
                     nav.navigate(Routes.gameplay(levelId))
                 },
                 onBack = { nav.popBackStack() },
+                onMissionsClick = { nav.navigate(Routes.MISSIONS) }
             )
         }
 

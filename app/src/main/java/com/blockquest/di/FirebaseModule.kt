@@ -30,6 +30,7 @@ import com.blockquest.domain.repository.CosmeticRepository
 import com.blockquest.domain.repository.DailyRewardConfigRepository
 import com.blockquest.domain.repository.LevelRepository
 import com.blockquest.domain.repository.MissionRepository
+import com.blockquest.domain.repository.PieceRepository
 import com.blockquest.domain.repository.PlayerRepository
 import com.blockquest.domain.repository.ProgressionRepository
 import com.blockquest.domain.repository.RemoteConfigRepository
@@ -189,6 +190,10 @@ abstract class RepositoryModule {
     @dagger.Binds
     @Singleton
     abstract fun bindAdRepository(impl: AdMobRewardedAdRepository): AdRepository
+
+    @dagger.Binds
+    @Singleton
+    abstract fun bindPieceRepository(impl: com.blockquest.data.local.LocalPieceRepository): PieceRepository
 }
 
 @Module
